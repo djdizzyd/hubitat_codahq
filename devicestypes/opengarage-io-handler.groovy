@@ -29,7 +29,7 @@ preferences {
 }
 
 metadata {
-    definition (name: "OpenGarage.io Driver", namespace: "codahq", author: "Ben Rimmasch") {
+    definition (name: "OpenGarage.io Driver", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
         capability "Door Control"
         capability "Garage Door Control"
         capability "Refresh"
