@@ -34,7 +34,7 @@ definition(
  **********/
 preferences {
 	page(name: "mainPage", title: "", nextPage: "scenesPage", uninstall: true) {
-		section("Use the orientation of this cube") {
+		section("Use the orientation of this \"cube\"") {
 			input "cube", "capability.threeAxis", required: false, title: "SmartSense Multi sensor"
 		}
 		section("To control these lights") {
@@ -50,7 +50,7 @@ preferences {
 			input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
 		}
 	}
-	page(name: "scenesPage", title: "Scenes", install: true, uninstall: true)
+	page(name: "scenesPage", title: "Sides", install: true, uninstall: true)
 	page(name: "scenePage", title: "Scene", install: false, uninstall: false, previousPage: "scenesPage")
 	page(name: "devicePage", install: false, uninstall: false, previousPage: "scenePage")
 	page(name: "saveStatesPage", install: false, uninstall: false, previousPage: "scenePage")
@@ -83,12 +83,12 @@ def scenePage(params=[:]) {
 		}
 
 		section {
-			href "devicePage", title: "Show Device States", params: [sceneId:sceneId], description: "", state: sceneIsDefined(sceneId) ? "complete" : "incomplete"
+			href "devicePage", title: "Configure Device States", params: [sceneId:sceneId], description: "", state: sceneIsDefined(sceneId) ? "complete" : "incomplete"
 		}
 
 		if (sceneId == currentSceneId) {
 			section {
-				href "saveStatesPage", title: "Record Current Device States", params: [sceneId:sceneId], description: ""
+				href "saveStatesPage", title: "Capture Current Device States", params: [sceneId:sceneId], description: ""
 			}
 		}
 
@@ -103,16 +103,16 @@ def devicePage(params) {
 	def sceneId = params.sceneId as Integer ?: state.lastDisplayedSceneId
 
 	dynamicPage(name:"devicePage", title: "${sceneId}. ${sceneName(sceneId)} Device States") {
-		section("Lights") {
+		section("Switches/Lights") {
 			lights.each {light ->
-				input "onoff_${sceneId}_${light.id}", "boolean", title: light.displayName
+				input "onoff_${sceneId}_${light.id}", "bool", title: "${light.displayName} Switch"
 			}
 		}
 
 		section("Dimmers") {
 			lights.each {light ->
 				if (state.lightCapabilities[light.id] in ["level", "color"]) {
-					input "level_${sceneId}_${light.id}", "enum", title: light.displayName, options: levels, description: "", required: false
+					input "level_${sceneId}_${light.id}", "enum", title: "${light.displayName} Level", options: levels, description: "", required: false
 				}
 			}
 		}
@@ -120,7 +120,7 @@ def devicePage(params) {
 		section("Colors (hue/saturation)") {
 			lights.each {light ->
 				if (state.lightCapabilities[light.id] == "color") {
-					input "color_${sceneId}_${light.id}", "text", title: light.displayName, description: "", required: false
+					input "color_${sceneId}_${light.id}", "text", title: "${light.displayName} Hue/Saturation", description: "", required: false
 				}
 			}
 		}
@@ -216,8 +216,8 @@ private restoreStates(sceneId) {
 
 	lights.each {light ->
 		def type = state.lightCapabilities[light.id]
-
-		def isOn = settings."onoff_${sceneId}_${light.id}" == "true" ? true : false
+		
+		def isOn = settings."onoff_${sceneId}_${light.id}"
 		logInfo "Setting ${light.displayName} switch to ${isOn ? 'on' : 'off'}"
 		if (isOn) {
 			light.on()
@@ -232,7 +232,7 @@ private restoreStates(sceneId) {
 			if (type == "level") {
 				logInfo "Setting ${light.displayName} level to '$level'"
 				if (level != null) {
-					light.setLevel(value)
+					light.setLevel(level)
 				}
 			}
 			else if (type == "color") {
@@ -306,7 +306,7 @@ private getOrientation(xyz=null) {
 		}
 	}
 	
-	final threshold = 900
+	final threshold = 850
 
 	def value = xyz ?: cube.currentValue("threeAxis")
 
