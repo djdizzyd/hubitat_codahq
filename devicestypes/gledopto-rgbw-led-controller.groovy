@@ -19,7 +19,7 @@
 import com.hubitat.zigbee.DataType
 
 private getEndpointId() {
-  //logDebug "endpoint id: ${device.endpointId}"
+  logDebug "endpoint id: ${device.endpointId}"
   new BigInteger(device.endpointId, 16).toString()
 }
 
@@ -48,14 +48,14 @@ metadata {
     command "setAdjustedColor"
     command "startLoop"
     command "stopLoop"
-    command "setLoopTime"
+    command "setLoopTime", [[name: "Set Loop Time*", type: "NUMBER", description: "Enter a value in seconds"]]
     command "setDirection"
 
-    command "white1On"
-    command "white1Off"
-    command "setWhite1Level", [[name: "White Level*", type: "NUMBER", description: "Enter a value between 0 and 100"], [name: "Duration", type: "NUMBER", description: "Enter a value in ms"]]
+    command "whiteOn"
+    command "whiteOff"
+    command "setWhiteLevel", [[name: "White Level*", type: "NUMBER", description: "Enter a value between 0 and 100"], [name: "Duration", type: "NUMBER", description: "Enter a value in ms"]]
 
-    command "alert"
+    command "alert", [[name: "Alert*", type: "ENUM", description: "Pick an action", constraints: ["Blink", "Breath", "Okay", "Stop"]]]
     command "toggle"
 
     // This is a new temporary counter to keep track of no responses
@@ -141,11 +141,11 @@ metadata {
     }
 
     standardTile("ww", "device.ww", height: 1, width: 1, inactiveLabel: false, decoration: "flat", canChangeIcon: false) {
-      state "off", label: "WW/W", action: "white1On", icon: "st.illuminance.illuminance.dark", backgroundColor: "#cccccc"
-      state "on", label: "WW/W", action: "white1Off", icon: "st.illuminance.illuminance.bright", backgroundColor: "#000000"
+      state "off", label: "WW/W", action: "whiteOn", icon: "st.illuminance.illuminance.dark", backgroundColor: "#cccccc"
+      state "on", label: "WW/W", action: "whiteOff", icon: "st.illuminance.illuminance.bright", backgroundColor: "#000000"
     }
     controlTile("wwSliderControl", "device.wwLevel", "slider", height: 1, width: 4, inactiveLabel: false) {
-      state "wwLevel", action: "setWhite1Level"
+      state "wwLevel", action: "setWhiteLevel"
     }
     valueTile("wwValueTile", "device.wwLevel", height: 1, width: 1) {
       state "wwLevel", label: '${currentValue}%'
@@ -225,8 +225,6 @@ def poll(){
 def configure(){
   logDebug "Initiating configuration reporting and binding"
 
-  zigbee.properties.each { log.info it }
-
   return [
     //These aren't implemented in hubitat so i'll do them manually as strings
     //zigbee.configSetup("6","0","0x10","0","60","{}"), "delay 1000",
@@ -259,7 +257,7 @@ def addChildWhiteChannel() {
     )
   }
   catch (e) {
-    log.info "Adding child device for white channel failed!  Was the child device handler installed?"
+    logInfo "Adding child device for white channel failed!  Was the child device handler installed?"
   }
 }
 
@@ -271,7 +269,7 @@ def notifyChildren(events) {
     events.each {
     event ->
 
-      log.info "notify child ${child} of ${event}"
+      logInfo "Notifying child ${child} of ${event}"
 
       if (event.name == "ww") {
         child.sendEvent(name: "switch", value: event.value)
@@ -320,14 +318,14 @@ def parse(String description) {
         if (description ?.endsWith("0100") || description ?.endsWith("1001") || description ?.matches("on/off\\s*:\\s*1")) {
           def result = createEvent(name: "switch", value: "on")
           sendEvent(name: "switchColor", value: (device.currentValue("colorMode") == "White" ? "White" : device.currentValue("colorName")), displayed: false)
-          log.debug "Parse returned ${result?.descriptionText}"
+          logDebug "Parse returned ${result?.descriptionText}"
           return result
         }
         else if (description ?.endsWith("0000") || description ?.endsWith("1000") || description ?.matches("on/off\\s*:\\s*0")) {
           if (!(description ?.startsWith("catchall: 0104 0300") || description ?.startsWith("catchall: 0104 0008"))) {
             def result = createEvent(name: "switch", value: "off")
             sendEvent(name: "switchColor", value: "off", displayed: false)
-            log.debug "Parse returned ${result?.descriptionText}"
+            logDebug "Parse returned ${result?.descriptionText}"
             return result
           }
         }
@@ -405,7 +403,8 @@ def parseDescriptionAsMap(description) {
 
 def on(onTime = null) {
   // just assume it works for now
-  log.debug "on()"
+  logInfo "Turning RGB on"
+  logDebug "on()"
   sendEvent(name: "switch", value: "on")
   sendEvent(name: "switchColor", value: (device.currentValue("colorMode") == "White" ? "White" : device.currentValue("colorName")), displayed: false)
 
@@ -422,7 +421,8 @@ def on(onTime = null) {
 
 def off() {
   // just assume it works for now
-  log.debug "off()"
+  logInfo "Turning RGB off"
+  logDebug "off()"
   sendEvent(name: "loopActive", value: "Inactive")
   sendEvent(name: "switch", value: "off")
   sendEvent(name: "switchColor", value: "off", displayed: false)
@@ -433,6 +433,7 @@ def off() {
 }
 
 def toggle() {
+  logInfo "Toggling RGB to ${device.currentValue("switch") == "on" ? "off" : "on"}"
   if (device.currentValue("switch") == "on") {
     sendEvent(name: "switch", value: "off")
     sendEvent(name: "switchColor", value: "off")
@@ -444,8 +445,9 @@ def toggle() {
   "st cmd 0x${device.deviceNetworkId} ${endpointId} 6 2 {}"
 }
 
-def white1On(onTime = null) {
-  log.debug "white1On()"
+def whiteOn(onTime = null) {
+  logInfo "Turning white on"
+  logDebug "whiteOn()"
   sendEvent(name: "ww", value: "on")
   if (onTime) {
     def newTime = onTime * 10
@@ -457,27 +459,17 @@ def white1On(onTime = null) {
     "st cmd 0x${device.deviceNetworkId} ${dimmableEndpointId} 6 1 {}"
   }
 }
-def white1Off() {
-  // just assume it works for now
-  log.debug "white1Off()"
+def whiteOff() {
+	logInfo "Turning white off"
+  logDebug "whiteOff()"
   sendEvent(name: "ww", value: "off")
   "st cmd 0x${device.deviceNetworkId} ${dimmableEndpointId} 6 0 {}"
 }
 
-/*
-def setWwLevel(value) {
-	log.debug "setWwLevel: ${value}"
-    def level = Math.min(value as Integer, 99)    
-    level = 255 * level/99 as Integer
-	log.debug "level: ${level}"
-	level = hex(level)
-    getAction("/r?value=$level&channels=$channels&transition=$transition")
-}
-*/
-
 // adding duration to enable transition time adjustments
-def setWhite1Level(value, duration = 21) {
-  logDebug "setWhite1Level: ${value}"
+def setWhiteLevel(value, duration = 21) {
+  logInfo "Setting white level to ${value}"
+  logDebug "setWhiteLevel: ${value}"
   def transitionTime = swapEndianHex(hexF(duration, 4))
 
 
@@ -539,20 +531,20 @@ def alert(action) {
       break
   }
   if (valid) {
-    log.debug "Alert: ${action}, Value: ${value}"
+    logDebug "Alert: ${action}, Value: ${value}"
     sendEvent(name: "alert", value: action)
     "st cmd 0x${device.deviceNetworkId} ${endpointId} 3 0x40 {${value} 00}"
   }
-  else { log.debug "Invalid action" }
+  else { logDebug "Invalid action" }
 }
 
 def setDirection() {
   def direction = (device.currentValue("loopDirection") == "Down" ? "Up" : "Down")
-  log.trace direction
+  logTrace direction
   sendEvent(name: "loopDirection", value: direction)
   if (device.currentValue("loopActive") == "Active") {
     def dirHex = (direction == "Down" ? "00" : "01")
-    log.trace dirHex
+    logTrace dirHex
     "st cmd 0x${device.deviceNetworkId} ${endpointId} 0x300 0x44 {02 01 ${dirHex} 0000 0000}"
   }
 }
@@ -568,23 +560,23 @@ def setLoopTime(value) {
 def startLoop(Map params) {
   // direction either increments or decrements the hue value: "Up" will increment, "Down" will decrement
   def direction = (device.currentValue("loopDirection") != null ? (device.currentValue("loopDirection") == "Down" ? "00" : "01") : "00")
-  log.trace direction
+  logTrace direction
   if (params ?.direction != null) {
     direction = (params.direction == "Down" ? "00" : "01")
     sendEvent(name: "loopDirection", value: params.direction)
   }
-  log.trace direction
+  logTrace direction
 
   // time parameter is the time in seconds for a full loop
   def cycle = (device.currentValue("loopTime") != null ? device.currentValue("loopTime") : 2)
-  log.trace cycle
+  logTrace cycle
   if (params ?.time != null) {
     cycle = params.time
     if (cycle >= 1 && cycle <= 60) { sendEvent(name: "loopTime", value: cycle) }
   }
-  log.trace cycle
+  logTrace cycle
   def finTime = swapEndianHex(hexF(cycle, 4))
-  log.trace finTime
+  logTrace finTime
 
   def cmds = []
   cmds << "st cmd 0x${device.deviceNetworkId} ${endpointId} 6 1 {}"
@@ -701,7 +693,7 @@ https://github.com/puzzle-star/SmartThings-IKEA-Tradfri-RGB
 */
 
 def setColor(value, duration = 32){
-  log.trace "setColor($value)"
+  logDebug "setColor($value)"
 
   def transitionTime = swapEndianHex(hexF(duration, 4))
 
@@ -769,14 +761,13 @@ def setColor(value, duration = 32){
 }
 
 def setSaturation(value, duration = 32) {
-
+  logTrace "setSaturation(${value})"
   def transitionTime = swapEndianHex(hexF(duration, 4))
   def max = 0xfe
-  // log.trace "setSaturation($value)"
   sendEvent(name: "saturation", value: value)
   def scaledValue = Math.round(value * max / 100.0)
   def cmd = "st cmd 0x${device.deviceNetworkId} ${endpointId} 0x300 0x03 {${hex(scaledValue)} ${transitionTime}}"
-  //log.info cmd
+  logTrace cmd
   cmd
 }
 
@@ -882,6 +873,7 @@ private getColorName(hueValue){
 
 // adding duration to enable transition time adjustments
 def setLevel(value, duration = 21) {
+  logInfo "Setting RGB level to ${value}"
   logTrace "setLevel($value)"
   def transitionTime = swapEndianHex(hexF(duration, 4))
 
