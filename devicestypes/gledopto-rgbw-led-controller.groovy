@@ -53,7 +53,7 @@ metadata {
 
     command "white1On"
     command "white1Off"
-    command "setWhite1Level"
+    command "setWhite1Level", [[name: "White Level*", type: "NUMBER", description: "Enter a value between 0 and 100"], [name: "Duration", type: "NUMBER", description: "Enter a value in ms"]]
 
     command "alert"
     command "toggle"
@@ -171,14 +171,24 @@ metadata {
     main(["switch"])
     details(["switch", "levelSliderControl", "colorName", "colorTempSliderControl", "colorTemp", "ww", "wwSliderControl", "wwValueTile", "colorMode", "loop", "refresh", "loopTimeControl", "loopDir"])
   }
+
+	preferences {
+		input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
+		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+    input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
+	}
+}
+
+private logInfo(msg) {
+	if (descriptionTextEnable) log.info msg	
 }
 
 def logDebug(msg) {
-  log.debug msg
+  if (logEnable) log.debug msg
 }
 
 def logTrace(msg) {
-  //log.trace msg
+  if (traceLogEnable) log.trace msg
 }
 
 def refresh() {
@@ -467,12 +477,12 @@ def setWwLevel(value) {
 
 // adding duration to enable transition time adjustments
 def setWhite1Level(value, duration = 21) {
-  log.debug "setWhite1Level: ${value}"
+  logDebug "setWhite1Level: ${value}"
   def transitionTime = swapEndianHex(hexF(duration, 4))
 
 
   def unreachable = device.currentValue("unreachable")
-  log.debug unreachable
+  logDebug "Unreachable ${unreachable}"
   if (unreachable == null) {
     sendEvent(name: 'unreachable', value: 1)
   }
@@ -500,10 +510,10 @@ def setWhite1Level(value, duration = 21) {
   sendEvent(name: "wwLevel", value: value)
 
   def level = hex(value * 2.55)
-  if (value == 1) { level = hex(1) }
+
   cmds << "st cmd 0x${device.deviceNetworkId} ${dimmableEndpointId} 8 4 {${level} ${transitionTime}}"
 
-  //log.debug cmds
+  logDebug cmds
   cmds
 }
 
