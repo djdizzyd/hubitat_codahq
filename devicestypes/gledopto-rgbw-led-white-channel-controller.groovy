@@ -45,13 +45,13 @@ def initialize() {
 def on(onTime = null) {
   log.debug "on()"
 	sendEvent([name: "switch", value:"on", isStateChange: true])
-  parent.white1On(onTime)
+  parent.whiteOn(onTime)
 }
 
 def off() {
   log.debug "off()"
   sendEvent([name: "switch", value:"off", isStateChange: true])
-  parent.white1Off()
+  parent.whiteOff()
 }
 
 // adding duration to enable transition time adjustments
@@ -66,7 +66,7 @@ def setLevel(value, duration = 21) {
   }
   sendEvent(name: "level", value: value)
 
-  parent.setWhite1Level(value, duration)
+  parent.setWhiteLevel(value, duration)
 }
 
 def toggle() {
