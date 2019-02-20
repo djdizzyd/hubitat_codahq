@@ -218,7 +218,7 @@ def configure(){
   zigbee.properties.each { log.info it }
 
   return [
-    //These aren't implemented in hubitat
+    //These aren't implemented in hubitat so i'll do them manually as strings
     //zigbee.configSetup("6","0","0x10","0","60","{}"), "delay 1000",
     //Did I get it right?
     "he cr 0x${device.deviceNetworkId} 0x${device.endpointId} 0x0006 0 0x10 0 0x003C {}", "delay 1000",
@@ -264,16 +264,16 @@ def notifyChildren(events) {
       log.info "notify child ${child} of ${event}"
 
       if (event.name == "ww") {
-        child.sendEvent(name: "whiteChannel", value: event.value)
+        child.sendEvent(name: "switch", value: event.value)
       }
       else if (event.name == "wwLevel") {
         if (event.value == 0) {
-          child.sendEvent(name: "whiteChannel", value: "off")
+          child.sendEvent(name: "switch", value: "off")
         }
         else if (child.currentValue("whiteChannel") == "off") {
-          child.sendEvent(name: "whiteChannel", value: "on")
+          child.sendEvent(name: "switch", value: "on")
         }
-        child.sendEvent(name: "whiteChannelLevel", value: event.value)
+        child.sendEvent(name: "level", value: event.value)
       }
     }
   }

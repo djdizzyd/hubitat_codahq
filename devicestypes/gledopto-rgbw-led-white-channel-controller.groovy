@@ -18,15 +18,6 @@
 
 metadata {
   definition(name: "Gledopto RGBW LED White Channel Controller", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
-    /*
-    capability "Contact Sensor"
-    capability "Sensor"
-    capability "Health Check"
-
-    command "open"
-    command "close"
-    */
-
     capability "Switch Level"
     capability "Actuator"
     capability "Switch"
@@ -36,57 +27,6 @@ metadata {
     command "off"
     command "setLevel"
     command "toggle"
-  }
-
-  tiles {
-    /*
-    standardTile("contact", "device.contact", width: 2, height: 2) {
-        state("closed", label:'${name}', icon:"st.contact.contact.closed", backgroundColor:"#00A0DC", action: "open")
-        state("open", label:'${name}', icon:"st.contact.contact.open", backgroundColor:"#e86d13", action: "close")
-    }
-    standardTile("freezerDoor", "device.contact", width: 2, height: 2, decoration: "flat") {
-        state("closed", label:'Freezer', icon:"st.contact.contact.closed", backgroundColor:"#00A0DC")
-        state("open", label:'Freezer', icon:"st.contact.contact.open", backgroundColor:"#e86d13")
-    }
-    standardTile("mainDoor", "device.contact", width: 2, height: 2, decoration: "flat") {
-        state("closed", label:'Fridge', icon:"st.contact.contact.closed", backgroundColor:"#00A0DC")
-        state("open", label:'Fridge', icon:"st.contact.contact.open", backgroundColor:"#e86d13")
-    }
-    standardTile("control", "device.contact", width: 1, height: 1, decoration: "flat") {
-        state("closed", label:'${name}', icon:"st.contact.contact.closed", action: "open")
-        state("open", label:'${name}', icon:"st.contact.contact.open", action: "close")
-    }
-    main "contact"
-    details "contact"
-    */
-
-
-    multiAttributeTile(name: "whiteChannel", type: "lighting", width: 6, height: 4, canChangeIcon: true) {
-      tileAttribute("device.whiteChannel", key: "PRIMARY_CONTROL") {
-        attributeState "off", label: "Off", action: "on", icon: "st.illuminance.illuminance.dark", backgroundColor: "#ffffff"
-        attributeState "on", label: "On", action: "off", icon: "st.illuminance.illuminance.bright", backgroundColor: "#00a0dc"
-      }
-
-      tileAttribute("device.whiteChannelLevel", key: "SLIDER_CONTROL") {
-        attributeState "whiteChannelLevel", action: "setLevel"
-      }
-    }
-
-    standardTile("whiteChannelIcon", "device.whiteChannel", height: 1, width: 1, inactiveLabel: false, decoration: "flat", canChangeIcon: false) {
-      state "off", label: "WW/W", action: "on", icon: "st.illuminance.illuminance.dark", backgroundColor: "#ffffff"
-      state "on", label: "WW/W", action: "off", icon: "st.illuminance.illuminance.bright", backgroundColor: "#000000"
-    }
-    controlTile("whiteChannelSliderControl", "device.whiteChannelLevel", "slider", height: 1, width: 4, inactiveLabel: false) {
-      state "whiteChannelLevel", action: "setLevel"
-    }
-    valueTile("whiteChannelValueTile", "device.whiteChannelLevel", height: 1, width: 1) {
-      state "whiteChannelLevel", label: '${currentValue}%'
-    }
-
-    main "whiteChannel"
-    details(["whiteChannel", "whiteChannelIcon", "whiteChannelSliderControl", "whiteChannelValueTile"])
-
-
   }
 }
 
@@ -99,18 +39,18 @@ def updated() {
 }
 
 def initialize() {
-  sendEvent(name: "whiteChannel", value: "off")
+  sendEvent(name: "switch", value: "off")
 }
 
 def on(onTime = null) {
   log.debug "on()"
-  sendEvent(name: "whiteChannel", value: "on")
+	sendEvent([name: "switch", value:"on", isStateChange: true])
   parent.white1On(onTime)
 }
 
 def off() {
   log.debug "off()"
-  sendEvent(name: "whiteChannel", value: "off")
+  sendEvent([name: "switch", value:"off", isStateChange: true])
   parent.white1Off()
 }
 
@@ -119,12 +59,22 @@ def setLevel(value, duration = 21) {
   log.debug "setLevel: ${value}"
 
   if (value == 0) {
-    sendEvent(name: "whiteChannel", value: "off")
+    sendEvent(name: "switch", value: "off")
   }
-  else if (device.currentValue("whiteChannel") == "off") {
-    sendEvent(name: "whiteChannel", value: "on")
+  else if (device.currentValue("switch") == "off") {
+    sendEvent(name: "switch", value: "on")
   }
-  sendEvent(name: "whiteChannelLevel", value: value)
+  sendEvent(name: "level", value: value)
 
   parent.setWhite1Level(value, duration)
+}
+
+def toggle() {
+	log.debug "toggle()"
+	if (device.currentValue("switch") == "off") {
+		on()
+	}
+	else {
+		off()
+	}
 }
