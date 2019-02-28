@@ -87,8 +87,7 @@ private addChildDevices() {
   selectedZones.each {
     def deviceId = getDeviceId(it)
     if (!getChildDevice(deviceId)) {
-      //addChildDevice("redloro-smartthings", "Yamaha Zone", deviceId, location.hubs[0].id, ["name": it, label: "Zone ${it}: ${it}", completedSetup: true])
-      addChildDevice("redloro-smartthings", "Yamaha Zone", deviceId, [name: "Yamaha Zone ${it}", label: "${device.name} - Zone ${it}", isComponent: false])
+      addChildDevice("codahq-hubitat", "Yamaha Zone", deviceId, [name: "Yamaha Zone ${it}", label: "${device.name} - Zone ${it}", isComponent: false])
       log.debug "Added Yamaha zone: ${deviceId}"
     }
   }
