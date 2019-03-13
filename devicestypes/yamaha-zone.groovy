@@ -20,13 +20,14 @@ metadata {
      * List our capabilties. Doing so adds predefined command(s) which
      * belong to the capability.
      */
-    capability "Music Player"
+    //capability "Music Player"
     capability "Switch"
     capability "Switch Level"
     capability "Refresh"
     capability "Polling"
     capability "Sensor"
     capability "Actuator"
+    capability "AudioVolume"
 
     /**
      * Define all commands, ie, if you have a custom action not
@@ -42,15 +43,15 @@ metadata {
     command "source3"
     command "source4"
     command "source5"
-    command "mutedOn"
-    command "mutedOff"
     command "partyModeOn"
     command "partyModeOff"
-    command "zone"
-    command "setVolume", [[name: "Set Volume", type: "NUMBER", range: -80..15, description: "Enter dB (default range -80 to 15)"]]
+    command "setDb", [[name: "Set Volume", type: "NUMBER", range: -80..15, description: "Enter dB (default range -80 to 15)"]]
+    command "systemConfigReport"
 
     attribute "dB", "number"
     attribute "volume", "number"
+    attribute "source", "string"
+    attribute "partyMode", "string"
   }
 
   /**
@@ -143,6 +144,7 @@ metadata {
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
     input name: "maxVolume", type: "number", range: -80..15, title: "Max Volume", description: "Enter the maximum volume in reference decibals that the receiver is allowed", defaultValue: 0
     input name: "minVolume", type: "number", range: -80..15, title: "Min Volume", description: "Enter the minimum volume in reference decibals that the receiver is allowed", defaultValue: -80
+    input name: "volumeStep", type: "decimal", range: 0.5..10, title: "Volume Step", description: "Enter the amount the volume up and down commands should adjust the volume", defaultValue: 2.5
   }
 }
 
@@ -165,22 +167,20 @@ def getDEFAULT_MIN_VOL() {
   return -80
 }
 
-/**************************************************************************
- * The following section simply maps the actions as defined in
- * the metadata into onAction() calls.
- *
- * This is preferred since some actions can be dealt with more
- * efficiently this way. Also keeps all user interaction code in
- * one place.
- *
- */
-
 def updated() {
-  if (maxVolume == null) {
+  if (maxVolume == null || maxVolume > 15) {
+    log.warn "Max volume out of bounds!  Setting to ${DEFAULT_MAX_VOL}"
     device.updateSetting("maxVolume", DEFAULT_MAX_VOL)
   }
-  if (minVolume == null) {
+  if (minVolume == null || minVolume < DEFAULT_MIN_VOL) {
+    log.warn "Min volume out of bounds!  Setting to ${DEFAULT_MIN_VOL}"
     device.updateSetting("maxVolume", DEFAULT_MIN_VOL)
+  }
+  def newStep = roundNearestHalf(volumeStep)
+  newStep = newStep > 0 && newstep <= 10 ? newStep : 2.5
+  if (newStep != volumeStep) {
+    log.warn "Volume Step is changing!  Setting to ${newStep}"
+    device.updateSetting("volumeStep", newStep)
   }
 }
 
@@ -199,7 +199,7 @@ def off() {
 }
 
 def setLevel(value) {
-  logDebug("setLevel()")
+  logDebug("setLevel(${value})")
   if (value > 100) value = 100
   if (value < 0) value = 0
   logInfo("Zone ${getZone()} volume set to ${value}")
@@ -211,21 +211,48 @@ def setLevel(value) {
 
 def setVolume(value) {
   logDebug("setVolume(${value})")
-  if (value > maxVolume) value = maxVolume
-  if (value < minVolume) value = minVolume
+  setLevel(value)
+}
+
+def setDb(value) {
+  logDebug("setDb(${value})")
+  def double dB = value
+  if (dB > maxVolume) dB = maxVolume
+  if (dB < minVolume) dB = minVolume
   logInfo("Zone ${getZone()} volume set to ${value}")
   sendVolume(value)
   sendEvent(name: "volume", value: calcRelativePercent(value).intValue())
   sendEvent(name: "level", value: calcRelativePercent(value).intValue())
 }
 
-def sendVolume(db) {
+def volumeUp() {
+  setDb(device.currentValue("dB") + volumeStep)
+}
+
+def volumeDown() {
+  setDb(device.currentValue("dB") - volumeStep)
+}
+
+def sendVolume(double db) {
   logTrace "sendVolume(${db})"
   db = roundNearestHalf(db)
   def strCmd = "<YAMAHA_AV cmd=\"PUT\"><${getZone()}><Volume><Lvl><Val>${(db * 10).intValue()}</Val><Exp>1</Exp><Unit>dB</Unit></Lvl></Volume></${getZone()}></YAMAHA_AV>"
   logTrace groovy.xml.XmlUtil.escapeXml("strCmd ${strCmd}")
   sendCommand(strCmd)
   sendEvent(name: "dB", value: db)
+}
+
+def mute() {
+  sendCommand("<YAMAHA_AV cmd=\"PUT\"><${getZone()}><Volume><Mute>On</Mute></Volume></${getZone()}></YAMAHA_AV>")
+  sendEvent(name: "mute", value: "muted")
+}
+def unmute() {
+  sendCommand("<YAMAHA_AV cmd=\"PUT\"><${getZone()}><Volume><Mute>Off</Mute></Volume></${getZone()}></YAMAHA_AV>")
+  sendEvent(name: "mute", value: "unmuted")
+}
+
+def systemConfigReport() {
+  sendCommand("<YAMAHA_AV cmd=\"GET\"><System><Config>GetParam</Config></System></YAMAHA_AV>")
 }
 
 def source0() {
@@ -246,14 +273,7 @@ def source4() {
 def source5() {
   setSource(5)
 }
-def mutedOn() {
-  sendCommand("<YAMAHA_AV cmd=\"PUT\"><${getZone()}><Volume><Mute>On</Mute></Volume></${getZone()}></YAMAHA_AV>")
-  sendEvent(name: "muted", value: "on")
-}
-def mutedOff() {
-  sendCommand("<YAMAHA_AV cmd=\"PUT\"><${getZone()}><Volume><Mute>Off</Mute></Volume></${getZone()}></YAMAHA_AV>")
-  sendEvent(name: "muted", value: "off")
-}
+
 def partyModeOn() {
   sendCommand("<YAMAHA_AV cmd=\"PUT\"><System><Party_Mode><Mode>On</Mode></Party_Mode></System></YAMAHA_AV>")
   sendEvent(name: "partyMode", value: "on")
@@ -281,7 +301,8 @@ def parse(String description) {
 }
 
 def setSource(id) {
-  //log.debug "source: "+getSourceName(id)
+  logDebug "setSource(${id})"
+  logInfo "Setting source to " + getSourceName(id)
   sendCommand("<YAMAHA_AV cmd=\"PUT\"><${getZone()}><Input><Input_Sel>" + getSourceName(id) + "</Input_Sel></Input></${getZone()}></YAMAHA_AV>")
   setSourceTile(getSourceName(id))
 }
@@ -289,7 +310,8 @@ def setSource(id) {
 def getSourceName(id) {
   if (settings) {
     return settings."source${id}"
-  } else {
+  }
+  else {
     return ['AV1', 'AV2', 'AV3', 'AV4', 'AV5', 'AV6'].get(id)
   }
 }
@@ -307,6 +329,12 @@ def setSourceTile(name) {
 }
 
 def zone(evt) {
+  if (evt == null) {
+    log.warn "Calling from UI not implemented!"
+  }
+  //This is even too much logging for trace.  Let's leave it commented for now.
+  //logTrace "zone(evt) with evt: ${groovy.xml.XmlUtil.escapeXml(groovy.xml.XmlUtil.serialize(evt))}"
+
   /*
   * Zone On/Off
   */
@@ -319,15 +347,18 @@ def zone(evt) {
   */
   if (evt.Basic_Status.Volume.Lvl.Val.text()) {
     def int volLevel = evt.Basic_Status.Volume.Lvl.Val.toInteger() ?: -250
-    //sendEvent(name: "volume", value: ((volLevel + 800) / 9).intValue())
-    sendEvent(name: "volume", value: (volLevel / 10).intValue())
+    def double dB = volLevel / 10.0
+    sendEvent(name: "volume", value: calcRelativePercent(dB).intValue())
+    sendEvent(name: "level", value: calcRelativePercent(dB).intValue())
+    sendEvent(name: "dB", value: dB)
+
   }
 
   /*
   * Zone Muted
   */
   if (evt.Basic_Status.Volume.Mute.text()) {
-    sendEvent(name: "muted", value: (evt.Basic_Status.Volume.Mute.text() == "On") ? "on" : "off")
+    sendEvent(name: "mute", value: (evt.Basic_Status.Volume.Mute.text() == "On") ? "muted" : "unmuted")
   }
 
   /*
@@ -342,6 +373,25 @@ def zone(evt) {
   */
   if (evt.Party_Mode.Mode.text()) {
     sendEvent(name: "partyMode", value: (evt.Party_Mode.Mode.text() == "On") ? "on" : "off")
+  }
+
+  if (evt.Config.Name.Input.text()) {
+    def supportedSources = evt.Config.Name.Input.children().findAll { node ->
+      node.text() ?.trim()
+    }
+    logTrace "supportedSources: ${supportedSources}"
+    state.supportedSources = supportedSources.join(", ")
+  }
+
+  if (evt.Config.Feature_Existence.text()) {
+    def supportedFeatures = evt.Config.Feature_Existence.children().inject([]) { acc, node ->   
+      if (node ?.text() ?.trim() == "1") {
+        acc << node.name()
+      }
+      acc
+    }
+    logTrace "supportedFeatures: ${supportedFeatures}"
+    state.supportedFeatures = supportedFeatures.join(", ")
   }
 }
 
@@ -371,6 +421,6 @@ private calcRelativeValue(perc) {
 
 private roundNearestHalf(value) {
   logTrace "roundNearestHalf(${value})"
-  logTrace Math.round(value * 2) / 2
-  return Math.round(value * 2) / 2
+  logTrace "result: ${Math.round(value * 2) / 2.0}"
+  return Math.round(value * 2) / 2.0
 }
