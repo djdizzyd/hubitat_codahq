@@ -19,7 +19,8 @@
  */
 
 metadata {
-  definition(name: "Optoma UHD51A", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
+  definition(name: "Optoma UHD51A", namespace: "codahq-hubitat", author: "Ben Rimmasch",
+            importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/optoma-uhd51a.groovy") {
     capability "Sensor"
     capability "Telnet"
     capability "Initialize"
