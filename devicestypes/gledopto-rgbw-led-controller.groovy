@@ -16,7 +16,7 @@
  *
  */
 
-import com.hubitat.zigbee.DataType
+//import com.hubitat.zigbee.DataType
 
 private getEndpointId() {
   logDebug "endpoint id: ${device.endpointId}"
@@ -55,7 +55,7 @@ metadata {
     command "whiteOff"
     command "setWhiteLevel", [[name: "White Level*", type: "NUMBER", description: "Enter a value between 0 and 100"], [name: "Duration", type: "NUMBER", description: "Enter a value in ms"]]
 
-    command "alert", [[name: "Alert*", type: "ENUM", description: "Pick an action", constraints: ["Blink", "Breath", "Okay", "Stop"]]]
+    command "alert", [[name: "Alert*", type: "ENUM", description: "Pick an action", constraints: ["Blink", "Breathe", "Okay", "Stop"]]]
     command "toggle"
 
     // This is a new temporary counter to keep track of no responses
@@ -172,15 +172,15 @@ metadata {
     details(["switch", "levelSliderControl", "colorName", "colorTempSliderControl", "colorTemp", "ww", "wwSliderControl", "wwValueTile", "colorMode", "loop", "refresh", "loopTimeControl", "loopDir"])
   }
 
-	preferences {
-		input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
-		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+  preferences {
+    input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
+    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
-	}
+  }
 }
 
 private logInfo(msg) {
-	if (descriptionTextEnable) log.info msg	
+  if (descriptionTextEnable) log.info msg
 }
 
 def logDebug(msg) {
@@ -264,12 +264,12 @@ def addChildWhiteChannel() {
 def notifyChildren(events) {
   def children = getChildDevices()
   children.each {
-  child ->
+    child ->
 
-    events.each {
-    event ->
+      events.each {
+      event ->
 
-      logInfo "Notifying child ${child} of ${event}"
+        logInfo "Notifying child ${child} of ${event}"
 
       if (event.name == "ww") {
         child.sendEvent(name: "switch", value: event.value)
@@ -396,7 +396,7 @@ def parse(String description) {
 def parseDescriptionAsMap(description) {
   (description - "read attr - ").split(",").inject([: ]) {
     map, param ->
-    def nameAndValue = param.split(":")
+      def nameAndValue = param.split(":")
     map += [(nameAndValue[0].trim()): nameAndValue[1].trim()]
   }
 }
@@ -460,7 +460,7 @@ def whiteOn(onTime = null) {
   }
 }
 def whiteOff() {
-	logInfo "Turning white off"
+  logInfo "Turning white off"
   logDebug "whiteOff()"
   sendEvent(name: "ww", value: "off")
   "st cmd 0x${device.deviceNetworkId} ${dimmableEndpointId} 6 0 {}"
