@@ -376,15 +376,17 @@ def zone(evt) {
   }
 
   if (evt.Config.Name.Input.text()) {
-    def supportedSources = evt.Config.Name.Input.children().findAll { node ->
-      node.text() ?.trim()
+    def supportedSources = evt.Config.Name.Input.children().findAll {
+      node ->
+        node.text() ?.trim()
     }
     logTrace "supportedSources: ${supportedSources}"
     state.supportedSources = supportedSources.join(", ")
   }
 
   if (evt.Config.Feature_Existence.text()) {
-    def supportedFeatures = evt.Config.Feature_Existence.children().inject([]) { acc, node ->   
+    def supportedFeatures = evt.Config.Feature_Existence.children().inject([]) {
+      acc, node ->   
       if (node ?.text() ?.trim() == "1") {
         acc << node.name()
       }
