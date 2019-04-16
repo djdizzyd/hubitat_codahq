@@ -1,4 +1,6 @@
 /**
+ *  zooZ motion sensor ZSE-02 v0.1
+ *
  *  Copyright 2018 Ben Rimmasch
  *  
  *  Original code derived from "V 1.2 of zooZ motion sensor ZSE-02 code 5/14/16" by Robert Vandervoort
@@ -22,7 +24,8 @@
  */
 
 metadata {
-  definition(name: "zooZ motion sensor ZSE-02", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
+  definition(name: "zooZ motion sensor ZSE-02", namespace: "codahq-hubitat", author: "Ben Rimmasch",
+      importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/zooz-motion-sensor-zse02.groovy") {
     capability "Motion Sensor"
     capability "Acceleration Sensor"
     capability "Sensor"
