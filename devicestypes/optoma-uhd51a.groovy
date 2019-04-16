@@ -11,7 +11,9 @@
  *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
  *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
  *  for the specific language governing permissions and limitations under the License.
- *    
+ *
+ *  Even though this document doesn't match this project exactly most commands came from here:
+ *    https://www.optomaeurope.com/uploads/RS232/EP782-RS232-en.pdf
  *
  *  Change Log:
  *  2019-04-13: Initial
