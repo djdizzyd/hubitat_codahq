@@ -1,5 +1,5 @@
 /**
- *  Optomoa UHD51A Device Driver 0.11
+ *  Optoma UHD51A Device Driver 0.11
  *  
  *  Copyright 2019 Ben Rimmasch
  *
