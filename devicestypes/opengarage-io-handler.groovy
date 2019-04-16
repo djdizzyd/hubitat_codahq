@@ -226,13 +226,13 @@ def parse(description) {
       if (state.doorStatus) {
         logInfo "Door open so closing"
         state.doorStatus = 0
-      } 
-			else {
+      }
+      else {
         logInfo "Door closed so opening"
         state.doorStatus = 1
       }
-			events << createEvent(name: "vehicle", value: "na", descriptionText: "${device.name}'s vehicle updated to 'na' while door is moving", displayed: false)  
-			runIn(state.garageMotionTime.toInteger(), refresh)
+      events << createEvent(name: "vehicle", value: "na", descriptionText: "${device.name}'s vehicle updated to 'na' while door is moving", displayed: false)  
+      runIn(state.garageMotionTime.toInteger(), refresh)
     }
     //status update request
     if (json.mac) {
@@ -242,16 +242,16 @@ def parse(description) {
       }
       def action = json.door ? "open" : "closed"
       if (state.doorStatus != json.door || device.currentValue("door") == "closing" || device.currentValue("door") == "opening") {
-				if (device.currentValue("door") == "closing" || device.currentValue("door") == "opening") {
-					runIn(state.garageMotionTime.toInteger(), refresh)
-				}
-				state.doorStatus = json.door
+        if (device.currentValue("door") == "closing" || device.currentValue("door") == "opening") {
+          runIn(state.garageMotionTime.toInteger(), refresh)
+        }
+        state.doorStatus = json.door
         logInfo "Door is ${action}. Refreshing state"
-        events << createEvent(name: "door", value: action, descriptionText: "${device.name} updated to ${action}")
+        sendEvent(name: "door", value: action, descriptionText: "${device.name} updated to ${action}")
       }			
       else {
         logDebug "Door state already in sync.  No change necessary"
-        events << createEvent(name: "door", value: action, descriptionText: "${device.name} already synchronized", displayed: false, isStateChange: false)
+        sendEvent(name: "door", value: action, descriptionText: "${device.name} already synchronized", displayed: false, isStateChange: false)
       }
 
       logDebug "and closing/opening is ${state.closing}/${state.opening}"
@@ -260,7 +260,7 @@ def parse(description) {
         if (state.closing == 1) {
           state.closing = 0
           logDebug "Door can close"
-					sendEvent(name: "door", value: "closing")
+          sendEvent(name: "door", value: "closing", descriptionText: "${device.name} updated to closing")
           api("openclose", [])
         }
         if (state.opening == 1) {
@@ -272,7 +272,7 @@ def parse(description) {
         if (state.opening == 1) {
           state.opening = 0
           logDebug "Door can open"
-					sendEvent(name: "door", value: "opening")
+          sendEvent(name: "door", value: "opening", descriptionText: "${device.name} updated to opening")
           api("openclose", [])
         }
         if (state.closing == 1) {
