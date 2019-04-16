@@ -1,12 +1,12 @@
 /**
- *  Monoprice Z-Wave Plus Shock Detector PID 15269
+ *  Monoprice Z-Wave Plus Shock Detector PID 15269 v0.1
  *  Ben Rimmasch
  *
  *  Made from pieces of the ST Vision Shock Sensor by krlaframboise
  *
  *  If the Monoprice guys sent you to use this sensor shame on them.
  *
- *    1.0 (03/13/2019)
+ *    0.1 (03/13/2019)
  *      -  Initial Release
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -21,7 +21,8 @@
  */
 metadata {
   definition(
-    name: "Monoprice Shock Sensor", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
+    name: "Monoprice Shock Sensor", namespace: "codahq-hubitat", author: "Ben Rimmasch",
+      importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/monoprice-shock-sensor.groovy") {
     capability "Sensor"
     capability "Acceleration Sensor"
     capability "Battery"
