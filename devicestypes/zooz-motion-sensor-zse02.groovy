@@ -70,21 +70,31 @@ metadata {
     details(["main", "acceleration", "battery"])
   }
   preferences {
-    input "debugOutput", "boolean",
-      title: "Enable debug logging?",
-        defaultValue: false,
-          displayDuringSetup: true
+    input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
+    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+    input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
   }
 }
 
-def updated()
-{
-  updateDataValue("configured", "false")
-  state.debug = ("true" == debugOutput)
+private logInfo(msg) {
+  if (descriptionTextEnable) log.info msg
 }
 
-def parse(String description)
-{
+def logDebug(msg) {
+  if (logEnable) log.debug msg
+}
+
+def logTrace(msg) {
+  if (traceLogEnable) log.trace msg
+}
+
+def updated() {
+  updateDataValue("configured", "false")
+}
+
+def parse(String description) {
+  logDebug "parse(String description)"
+  logTrace "description: $description"
   def result = null
   if (description != "updated") {
     def cmd = zwave.parse(description, [0x31: 5, 0x71: 3, 0x7A: 2, 0x81: 1, 0x84: 2, 0x86: 1])
@@ -92,16 +102,18 @@ def parse(String description)
       result = zwaveEvent(cmd)
     }
   }
-  if (state.debug) log.debug "Parsed '${description}' to ${result.inspect()}"
+  logDebug "Parsed '${description}' to ${result.inspect()}"
   return result
 }
 
 def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
+  logDebug "zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd)"
+  logTrace "cmd: $cmd"
   def result = createEvent(descriptionText: "${device.displayName} woke up", displayed: true)
   def cmds = []
   if (!isConfigured()) {
     // we're still in the process of configuring a newly joined device
-    if (state.debug) log.debug("late configure")
+    logTrace("late configure")
     [result, response(configure())]
   } else if (isConfigured()) {
     cmds << zwave.batteryV1.batteryGet().format()
@@ -112,21 +124,25 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificReport cmd) {
-  if (state.debug) log.debug "---MANUFACTURER SPECIFIC REPORT V2--- ${device.displayName} sent deviceIdDataFormat: ${cmd.deviceIdDataFormat}, deviceIdDataLengthIndicator: ${cmd.deviceIdDataLengthIndicator}, deviceIdType: ${cmd.deviceIdType}, payload: ${cmd.payload}"
+  logDebug "zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificReport cmd)"
+  logTrace "cmd: deviceIdDataFormat: ${cmd.deviceIdDataFormat}, deviceIdDataLengthIndicator: ${cmd.deviceIdDataLengthIndicator}, deviceIdType: ${cmd.deviceIdType}, payload: ${cmd.payload}"
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionCommandClassReport cmd) {
-  if (state.debug) log.debug "---COMMAND CLASS VERSION REPORT V1--- ${device.displayName} has command class version: ${cmd.commandClassVersion} - payload: ${cmd.payload}"
+  logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionCommandClassReport cmd)"
+  logTrace "cmd: class version: ${cmd.commandClassVersion} - payload: ${cmd.payload}"
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
+  logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd)"
+  logTrace "cmd: firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
   def fw = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
   updateDataValue("fw", fw)
-  if (state.debug) log.debug "---VERSION REPORT V1--- ${device.displayName} is running firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
 }
 
 def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
-  if (state.debug) log.debug "---BATTERY V1 REPORT--- ${device.displayName} reports battery level of ${cmd.batteryLevel}"
+  logDebug "zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd)"
+  logTrace "cmd: battery level: ${cmd.batteryLevel}"
   def result = []
   def map = [name: "battery", unit: "%"]
   if (cmd.batteryLevel == 0xFF) {
@@ -156,12 +172,14 @@ def motionEvent(value) {
 }
 
 def zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
-  if (state.debug) log.debug "---BASIC SET REPORT V1--- ${device.displayName} sent value: ${cmd.value}"
+  logDebug "zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd)"
+  logTrace "cmd: value: ${cmd.value}"
   motionEvent(cmd.value)
 }
 
 def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
-  if (state.debug) log.debug "---NOTIFICATION REPORT V3--- ${device.displayName} sent eventParametersLength: ${cmd.eventParametersLength} eventParameter: ${cmd.eventParameter} notificationType: ${cmd.notificationType} event: ${cmd.event}"
+  logDebug "zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd)"
+  logTrace "cmd:  eventParametersLength: ${cmd.eventParametersLength} eventParameter: ${cmd.eventParameter} notificationType: ${cmd.notificationType} event: ${cmd.event}"
   def result = []
   if (cmd.notificationType == 7) {
     if (cmd.eventParameter == [8] && cmd.event == 0x00) {
@@ -184,12 +202,14 @@ def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
 }
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
+  logDebug "zwaveEvent(hubitat.zwave.Command cmd)"
+  logTrace "cmd: $cmd"
   createEvent(descriptionText: cmd.toString(), isStateChange: false)
 }
 
 def configure() {
-  if (state.debug) log.debug "--Sending configuration commands to zooZ motion sensor--"
-  if (state.debug) log.debug "settings: ${settings.inspect()}, state: ${state.inspect()}"
+  logDebug "configure()"
+  logTrace "settings: ${settings.inspect()}, state: ${state.inspect()}"
   setConfigured()
   def request = [
     // set wakeup interval to 20 mins
