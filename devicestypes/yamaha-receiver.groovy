@@ -130,7 +130,8 @@ private sendCommand(body) {
 
 private getHttpHeaders(headers) {
   def obj = [: ]
-  new String(headers.decodeBase64()).split("\r\n").each { param ->
+  new String(headers.decodeBase64()).split("\r\n").each {
+    param ->
       def nameAndValue = param.split(":")
     obj[nameAndValue[0]] = (nameAndValue.length == 1) ? "" : nameAndValue[1].trim()
   }
@@ -190,8 +191,7 @@ private updateDNI() {
 private getHostAddress() {
   if (getDeviceDataByName("ip") && getDeviceDataByName("port")) {
     return "${getDeviceDataByName("ip")}:${getDeviceDataByName("port")}"
-  }
-  else {
+  } else {
     return "${ip}:80"
   }
 }
