@@ -95,6 +95,26 @@ def updated() {
   updateDataValue("configured", "false")
 }
 
+def getSUPPORTED_COMMAND_CLASSES() {
+	//All the commented command classes are supported by the device per the spec but not used currently in the driver
+	//https://graph.api.smartthings.com/ide/doc/zwave-utils.html
+	return [
+		0x31: 5,  //0x31 Multilevel Sensor Command Class	COMMAND_CLASS_SENSOR_MULTILEVEL
+		//0x59: 3,  //0x59 Association Group Information (AGI) Command Class	COMMAND_CLASS_ASSOCIATION_GRP_INFO
+		//0x5A: 1,  //0x5A Device Reset Locally Command Class	COMMAND_CLASS_DEVICE_RESET_LOCALLY
+		//0x5E: 2,  //0x5E Z-Wave Plus Info Command Class	COMMAND_CLASS_ZWAVEPLUS_INFO
+		0x71: 3,  //0x71 Alarm Command Class	COMMAND_CLASS_ALARM
+		//0x72: 2,  //0x72 Manufacturer Specific Command Class	COMMAND_CLASS_MANUFACTURER_SPECIFIC
+		//0x73: 1,  //0x73 Powerlevel Command Class	COMMAND_CLASS_POWERLEVEL
+		0x7A: 2,  //0x7A Firmware Update Meta Data Command Class	COMMAND_CLASS_FIRMWARE_UPDATE_MD
+		//0x80: 1,  //0x80 Battery Command Class	COMMAND_CLASS_BATTERY
+		0x81: 1,  //0x81 Clock Command Class	COMMAND_CLASS_CLOCK
+		0x84: 2,  //0x84 Wake Up Command Class	COMMAND_CLASS_WAKE_UP
+		//0x85: 3,  //0x85 Association Command Class	COMMAND_CLASS_ASSOCIATION
+		0x86: 1   //0x86 Version Command Class	COMMAND_CLASS_VERSION
+	]	
+}
+
 def parse(String description) {
   logDebug "parse(String description)"
   logTrace "description: $description"
@@ -104,8 +124,11 @@ def parse(String description) {
     if (cmd) {
       result = zwaveEvent(cmd)
     }
+		else {
+			log.error "Unsupported message! description: ${description}"
+		}
   }
-  logDebug "Parsed '${description}' to ${result.inspect()}"
+  logDebug "Raw: '${description}' \nParsed:\n ${result.inspect()}"
   return result
 }
 
@@ -116,9 +139,11 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
   def cmds = []
   if (!isConfigured()) {
     // we're still in the process of configuring a newly joined device
-    logTrace("late configure")
+    logInfo("Not configured")
     [result, response(configure())]
-  } else if (isConfigured()) {
+  }
+	else if (isConfigured()) {
+		logInfo("Configured")
     cmds << zwave.batteryV1.batteryGet().format()
     cmds << "delay 3000"
     cmds << zwave.wakeUpV1.wakeUpNoMoreInformation().format()
@@ -138,7 +163,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionCommandClassReport cmd) {
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd)"
-  logTrace "cmd: firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
+  logTrace "cmd: $cmd" //+ " firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
   def fw = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
   updateDataValue("fw", fw)
 }
@@ -152,7 +177,8 @@ def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
     map.value = 1
     map.descriptionText = "${device.displayName} battery is low"
     map.isStateChange = true
-  } else {
+  }
+	else {
     map.value = cmd.batteryLevel
     map.descriptionText = "${device.displayName} battery is at ${cmd.batteryLevel}"
     map.isStateChange = true
@@ -167,10 +193,12 @@ def motionEvent(value) {
   if (value != 0) {
     map.value = "active"
     map.descriptionText = "$device.displayName detected motion"
-  } else {
+  }
+	else {
     map.value = "inactive"
     map.descriptionText = "$device.displayName motion has stopped"
   }
+	logInfo map.descriptionText
   createEvent(map)
 }
 
@@ -186,7 +214,8 @@ def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
   def result = []
   if (cmd.notificationType == 7) {
     if (cmd.eventParameter == [8] && cmd.event == 0x00) {
-      result << motionEvent(0)
+      //let BasicSet handle it for now to avoid duplicate events
+			//result << motionEvent(0)
     }
     else if (cmd.event == 0x03) {
       result << createEvent(name: "acceleration", value: "active", descriptionText: "$device.displayName has been deactivated by the switch.")
@@ -195,7 +224,8 @@ def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
       result << createEvent(name: "acceleration", value: "inactive", descriptionText: "$device.displayName has been reactivated by the switch.")
     }
     else if (cmd.event == 0x08) {
-      result << motionEvent(255)
+			//let BasicSet handle it for now to avoid duplicate events
+      //result << motionEvent(255)
     }
   }
   else {
