@@ -134,7 +134,7 @@ def parse(String description) {
 
 def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd)"
-  logTrace "cmd: $cmd"
+	logTrace "cmd: ${cmd.inspect()}"
   def result = createEvent(descriptionText: "${device.displayName} woke up", displayed: true)
   def cmds = []
   if (!isConfigured()) {
@@ -163,7 +163,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionCommandClassReport cmd) {
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd)"
-  logTrace "cmd: $cmd" //+ " firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
+	logTrace "cmd: ${cmd.inspect()}" //+ " firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
   def fw = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
   updateDataValue("fw", fw)
 }
