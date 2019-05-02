@@ -1,5 +1,5 @@
 /**
- *  OpenSprinkler Station
+ *  OpenSprinkler Station Driver
  *
  *
  *
@@ -18,26 +18,22 @@
 
 metadata {
   definition(name: "OpenSprinkler Station", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
-		capability "Refresh"
-		capability "Valve"
+    capability "Refresh"
+    capability "Valve"
     capability "Actuator"
     capability "Switch"
     capability "Sensor"
 
-    command "on", [[name: "Delay On", type: "NUMBER", description: "Enter a value in seconds to delay before turning on"], [name: "Duration", type: "NUMBER", description: "Enter a value in seconds to run before shutting off"]]
-    command "off"
-    command "open"
-		command "close"
-    
+    command "open", [[name: "Delay Open", type: "NUMBER", description: "Enter a value in seconds to delay before opening"], [name: "Duration", type: "NUMBER", description: "Enter a value in seconds to run before closing"]]
   }
-	
-	preferences {
-		input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
-		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
-		input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
+
+  preferences {
+    input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
+    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+    input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
     input name: "defaultRuntime", type: "number", range: 1..64800, title: "Default Duration", description: "Default duration in seconds this station will run if no duration is specified", defaultValue: 60, required: true
     input name: "runOnceRuntime", type: "number", range: 1..64800, title: "Run-once Duration", description: "Duration in seconds this station will run when the system runs a run-once program", defaultValue: 60, required: true
-	}
+  }
 }
 
 def installed() {
@@ -49,64 +45,66 @@ def updated() {
 }
 
 def initialize() {
-  sendEvent(name: "switch", value: "off")
-	sendEvent(name: "valve", value: "closed")
+  sendEvent(name: "switch", value: "on")
+  sendEvent(name: "valve", value: "closed")
 }
 
 def refresh() {
-	parent.refresh() 
+  parent.refresh()
 }
 
-def on(BigDecimal onTime = null, BigDecimal duration = null) {
-	logDebug "on(${onTime},${duration})"
-	unschedule()
-	if (onTime != null) {
-		logInfo "Turning on ${device.label} in ${onTime} seconds"
-		runIn(onTime.toInteger(), on, [overwrite: false, data: [duration: duration]])
-		return
-	}
-  open(duration)
+def open(BigDecimal delay = null, BigDecimal duration = null) {
+  logDebug "open(${delay},${duration})"
+  unschedule()
+  if (delay != null) {
+    logInfo "Opening ${device.label} in ${delay} seconds"
+    runIn(delay.toInteger(), callbackOpen, [overwrite: false, data: [duration: duration]])
+    return
+  }
+  else {
+    logTrace "duration ${duration}"
+    sendEvent([name: "valve", value: "open", isStateChange: true])
+    def runTime = duration == null ? defaultRuntime.toInteger() : duration.toInteger()
+    logInfo "Opening station ${device.label} for ${runTime} seconds"
+    runIn(runTime + 5, refresh, [overwrite: false])
+
+    parent.api(parent.getSTATION_RUN(), [sid: stationIndex, duration: runTime])
+  }
 }
 
-def on(data) {
-  logDebug "on($data)"
-	on(null, data.duration)
+def callbackOpen(data) {
+  logDebug "callbackOpen($data)"
+  open(null, data.duration)
 }
 
-def off() {
-  logDebug "off()"
-	unschedule()
-	close()
-}
 
-def open(duration) {
-  logDebug "open(${duration})"
-	logInfo "Opening station ${device.label}"
-	sendEvent([name: "valve", value:"open", isStateChange: true])
-	sendEvent([name: "switch", value:"on", isStateChange: true])
-  
-  def runTime = duration == null ? defaultRuntime.toInteger() : duration.toInteger()
-  logInfo "Turning off ${device.label} in ${runTime} seconds"
-  runIn(runTime + 5, refresh, [overwrite: false])
-  
-  parent.api(parent.getSTATION_RUN(), [sid: stationIndex, duration: runTime])
-}
 
 def close() {
-	logDebug "close()"
-	logInfo "Closing station ${device.label}"
-	sendEvent([name: "valve", value:"closed", isStateChange: true])
-	sendEvent([name: "switch", value:"off", isStateChange: true])
+  logDebug "close()"
+  unschedule()
+  logInfo "Closing station ${device.label}"
+  sendEvent([name: "valve", value: "closed", isStateChange: true])
   parent.api(parent.getSTATION_OFF(), [sid: stationIndex])
 }
 
 def duration() {
   logTrace "duration() ${runOnceRuntime}"
-	return runOnceRuntime as Integer
+  return runOnceRuntime as Integer
+}
+
+def off() {
+  //logDebug "off()"
+  //unschedule()
+  //close()
+  //not implemented
+}
+
+def on() {
+  //logDebug "on()"
+  //not implemented
 }
 
 private getStationIndex() {
-  logTrace "getStationIndex()"
   return new String(device.deviceNetworkId).tokenize('-')[1]
 }
 
