@@ -1,4 +1,6 @@
 /**
+ *  OpenSprinkler Controller Driver
+ *
  *  Copyright 2018 Ben Rimmasch
  *
  *
@@ -20,52 +22,64 @@ import groovy.json.JsonSlurper
 import java.security.MessageDigest
 
 def getSTATUS() {
-	return "status"
+  return "status"
+}
+
+def getENABLED() {
+  return "enabled"
 }
 
 def getSTATION_RUN() {
-	return "station-run"
+  return "station-run"
 }
 
 def getSTATION_OFF() {
-	return "station-off"
+  return "station-off"
 }
 
 def getRUN_ONCE_RUN() {
-	return "run-once-run" 
+  return "run-once-run"
 }
 
 def getRUN_ONCE_OFF() {
-	return "run-once-off" 
+  return "run-once-off"
 }
 
 def getALL() {
-	return "all"
+  return "all"
 }
 
 metadata {
-  definition(name: "OpenSprinkler Driver", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
+  definition(name: "OpenSprinkler Controller", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
     capability "Refresh"
     capability "Sensor"
     capability "Configuration"
     capability "Switch"
-    
-    attribute "operationEnabled", "bool"
+    capability "Valve"
+
+    //attribute "operationEnabled", "bool"
   }
-  
+
   preferences {
     input("password", "text", title: "Device Key", description: "Your OpenSprinker device password")
     input("ipadd", "text", title: "IP address", description: "The IP address of your OpenSprinkler unit", required: true)
-    input("port", "text", title: "Port", description: "The port of your OpenSprinkler unit", required: true)	
+    input("port", "text", title: "Port", description: "The port of your OpenSprinkler unit", required: true)
     input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: true
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: true
-		input name: "pollingInterval", type: "number", range: 5..3600, title: "Polling Interval", description: "Duration in seconds in between polls", defaultValue: 60, required: true
+    input name: "pollingInterval", type: "number", range: 5..3600, title: "Polling Interval", description: "Duration in seconds in between polls", defaultValue: 60, required: true
   }
 }
 
 def installed() {
   initialize()
+}
+
+def uninstalled() {
+  getChildDevices().each {
+    log.warn "Deleting device ${it.label} with DNI ${it.deviceNetworkId}"
+    deleteChildDevice(it.deviceNetworkId)
+  }
 }
 
 def updated() {
@@ -75,8 +89,8 @@ def updated() {
   try {
     if (ipadd != null && port != null) {
       if (device.deviceNetworkId != getHexHostAddress()) {
-      	device.deviceNetworkId = getHexHostAddress()
-      	logInfo "Device Network ID set to: ${device.deviceNetworkId}"
+        device.deviceNetworkId = getHexHostAddress()
+        logInfo "Device Network ID set to: ${device.deviceNetworkId}"
       }
     }
     else {
@@ -91,8 +105,9 @@ def updated() {
     device.updateSetting("password", [type: "STRING", value: ""])
   }
   if (state.hash == null) {
-  	 log.warn "A password must be configured in the device's preferences in the IDE."
+    log.warn "A password must be configured in the device's preferences in the IDE."
   }
+  configure()
   refresh()
 }
 
@@ -109,18 +124,20 @@ def configure() {
 }
 
 def refresh() {
-	logInfo "Refreshing status from ${device.label}"
+  logInfo "Refreshing status from ${device.label}"
   unschedule()
-	state.updatedDate = now()
+  state.updatedDate = now()
   api(STATUS)
+  //api(ENABLED)
   customPolling()
 }
 
-def on() {
+def open() {
   unschedule()
   def durations = "["
-  state.stations.eachWithIndex { station, idx ->
-		int dur
+  state.stations.eachWithIndex {
+    station, idx ->
+    int dur
     if (!station.disabled) {
       def child = getChildDevice(getChildDeviceId(idx))
       dur = child.duration() == null ? 0 : child.duration()
@@ -128,21 +145,21 @@ def on() {
     else {
       dur = 0
     }
-		durations += "${dur},"
+    durations += "${dur},"
   }
   durations = durations.substring(0, durations.length() - 1) + "]"
   logTrace durations
-	
-	api(RUN_ONCE_RUN, [durations: durations])  
+
+  api(RUN_ONCE_RUN, [durations: durations])
 }
 
-def off() {
-	unschedule()
+def close() {
+  unschedule()
   api(RUN_ONCE_OFF)
 }
 
 def customPolling() {
-	logTrace "customPolling(${pollingInterval}) now:${now()} state.lastUpdated:${state.lastUpdated}"
+  logTrace "customPolling(${pollingInterval}) now:${now()} state.lastUpdated:${state.lastUpdated}"
   if (!isConfigured()) {
     logInfo "Polling canceled. Please configure the device!"
     return
@@ -160,23 +177,24 @@ def api(method, args = []) {
   logDebug "api(${method}, ${args})"
   def methods = [
     "status": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/js?pw=${state.hash}", gdtype: "GET"],
-		"station-run": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cm?pw=${state.hash}&sid=${args.sid}&en=1&t=${ args.duration != null ? args.duration : 30 }", gdtype: "GET"],
-		"station-off": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cm?pw=${state.hash}&sid=${args.sid}&en=0", gdtype: "GET"],
-    "run-once-run": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cr?pw=${state.hash}&t=${ args.durations != null ? args.durations : "[0,0,0,0,0,0,0,0]" }", gdtype: "GET"],
+    "station-run": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cm?pw=${state.hash}&sid=${args.sid}&en=1&t=${ args.duration != null ? args.duration : 30 }", gdtype: "GET"],
+    "station-off": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cm?pw=${state.hash}&sid=${args.sid}&en=0", gdtype: "GET"],
+    "run-once-run": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cr?pw=${state.hash}&t=${ args.durations != null ? args.durations : "[0, 0, 0, 0, 0, 0, 0, 0]" }", gdtype: "GET"],
     "run-once-off": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/cv?pw=${state.hash}&rsn=1", gdtype: "GET"],
-    "all": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/ja?pw=${state.hash}", gdtype: "GET"]
+    "all": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/ja?pw=${state.hash}", gdtype: "GET"],
+    "enabled": [gdipadd: "${ipadd}", gdport: "${port}", gdpath: "/jc?pw=${state.hash}", gdtype: "GET"]
   ]
 
-  if (method == STATION_RUN && device.currentValue("switch") != "on") {
-  	logInfo "OpenSprinker is on" 
-    sendEvent([name: "switch", value: "on", isStateChange: true])
+  if (method == STATION_RUN && device.currentValue("valve") != "open") {
+    logInfo "A station valve is open!"
+    sendEvent([name: "valve", value: "open", isStateChange: true])
   }
 
   def request = methods.getAt(method)
   doRequest(request.gdipadd, request.gdport, request.gdpath, request.gdtype)
-  
+
   //http://10.10.10.250/jp?cr=ec5e317122e24ef7354e94697ef321c0&t=[5,0,5,0,5,0,5,0]
-  
+
 }
 
 private doRequest(gdipadd, gdport, gdpath, gdtype) {
@@ -217,8 +235,8 @@ private doRequest(gdipadd, gdport, gdpath, gdtype) {
 }
 
 def parse(description) {
-	logDebug "start parse"
-  
+  logDebug "start parse"
+
   try {
     def msg = parseLanMessage(description)
     logTrace "msg: ${msg}"
@@ -227,13 +245,16 @@ def parse(description) {
     def json = slurper.parseText(msg.body)
 
     logTrace json
-    
+
     if (json.settings) {
-    	handleSetup(json) 
+      handleSetup(json)
     }
     if (json.sn) {
-    	handleStationStatus(json) 
-    }    
+      handleStationStatus(json)
+    }
+    if (json.en) {
+      handleEnabled(json.en)
+    }
     if (json.result || json.refresh) {
       if (json.result != 1) {
         log.warn "Last action was not successful! Result: ${json.result}"
@@ -250,18 +271,19 @@ def parse(description) {
 }
 
 private handleSetup(json) {
-	logDebug "handleSetup() ${json}"
+  logDebug "handleSetup() ${json}"
   def stations = handleStationNames(json.stations)
-  stations.eachWithIndex { station, idx ->
+  stations.eachWithIndex {
+    station, idx ->
     if (idx < state.nstations && !station.disabled) {
       logDebug "Checking enabled station ${station} at index ${idx}"
-      
+
       def deviceId = getChildDeviceId(idx)
-    	if (!getChildDevice(deviceId)) {
-				addChildDevice("codahq-hubitat", "OpenSprinkler Station", deviceId, [name: "OpenSprinkler Station", label: "OS Station ${station.name}", isComponent: false])
-      	logInfo "Added station ${station.name} with device id ${deviceId}"
-    	}
-      
+      if (!getChildDevice(deviceId)) {
+        addChildDevice("codahq-hubitat", "OpenSprinkler Station", deviceId, [name: "OpenSprinkler Station", label: "OS Station ${station.name}", isComponent: false])
+        logInfo "Added station ${station.name} with device id ${deviceId}"
+      }
+
     }
     else {
       def child = getChildDevice(getChildDeviceId(idx))
@@ -274,46 +296,48 @@ private handleSetup(json) {
 }
 
 private handleStationStatus(json) {
-  logDebug "handleStationStatus() ${json}" 
+  logDebug "handleStationStatus() ${json}"
   if (json.nstations && json.nstations != state.nstations) {
     state.nstations = json.nstations
     logInfo "Number of stations set to ${state.nstations}"
   }
   if (!json.sn) return
   def stations = []
-  def switchOn = false
-  state.stations.eachWithIndex { station, idx ->
+  def valveOpen = false
+  state.stations.eachWithIndex {
+    station, idx ->
     logTrace "${station} index:${idx} open:${json.sn[idx]}"
     //if (json.sn[idx] == 1) {
     //  logInfo "Station ${station.name} (${idx}) is open"
     //}    
-    
+
     def child = getChildDevice(getChildDeviceId(idx))
     if (child != null) {
-			logTrace "child.state.switch: ${child.currentValue("switch")}"
-      def switchState = json.sn[idx] == 1 ? "on" : "off"
+      logTrace "child.state.switch: ${child.currentValue("switch")}"
+      def switchState = station.disabled == 1 ? "off" : "on"
       if (child.currentValue("switch") != switchState) {
         child.sendEvent([name: "switch", value: switchState, isStateChange: true])
-				logInfo "Station ${station.name} is ${switchState}"
+        logInfo "Station ${station.name} is ${switchState}"
       }
 
+      logTrace "child.state.valve: ${child.currentValue("valve")}"
       def valveState = json.sn[idx] == 1 ? "open" : "closed"
       if (child.currentValue("valve") != valveState) {
         child.sendEvent([name: "valve", value: valveState, isStateChange: true])
-				logInfo "Station ${station.name} is ${valveState}"
+        logInfo "Station ${station.name} is ${valveState}"
       }
     }
-    
+
     stations << [name: station.name, open: json.sn[idx], disabled: station.disabled]
-    switchOn = switchOn || json.sn[idx] == 1
+    valveOpen = valveOpen || json.sn[idx] == 1
   }
-  
-  def switchState = switchOn ? "on" : "off"
-  if (device.currentValue("switch") != switchState) {
-    logInfo "OpenSprinker is ${switchState}"
-    sendEvent([name: "switch", value: switchState, isStateChange: true])
+
+  def valveState = valveOpen ? "open" : "closed"
+  if (device.currentValue("valve") != valveState) {
+    logInfo "OpenSprinker is ${valveState}"
+    sendEvent([name: "valve", value: valveState, isStateChange: true])
   }
-  
+
   state.stations = stations
   return stations
 }
@@ -322,21 +346,22 @@ private handleStationNames(json) {
   logDebug "handleStationNames() ${json}"
   if (!state.nstations) return
   if (!json.stn_dis) return
-  
+
   def bits = convertIntToBitSet(json.stn_dis[0])
   logDebug bits
-  
+
   boolean[] disabled = new boolean[state.nstations]
-  
+
   int index = 0;
-  for(int i = bits.length() - 1; i >= 0; i--)
+  for (int i = bits.length() - 1; i >= 0; i--)
   {
-      disabled[i] = bits.charAt(index) == "1"
-      index++
+    disabled[i] = bits.charAt(index) == "1"
+    index++
   }
-  
+
   def stations = []
-  json.snames.eachWithIndex { name, idx ->
+  json.snames.eachWithIndex {
+    name, idx ->
     if (idx < state.nstations) {
       logDebug "Found station ${name} at index ${idx}"
       stations << [name: name, disabled: disabled[idx]]
@@ -347,9 +372,10 @@ private handleStationNames(json) {
 
 private handleEnabled(enabled) {
   logDebug "handleEnabled($enabled)"
-  sendEvent([name:"operationEnabled", value: enabled == 1, displayed:true, isStateChange:true])
-  if (device.currentValue("operationEnabled") != enabled == 1) {
-    logInfo "OpenSprinler system is ${enabled == 1 ? "enabled" : "disabled"}"
+  def value = enabled ? "on" : "off"
+  sendEvent([name: "switch", value: value, displayed: true, isStateChange: true])
+  if (device.currentValue("switch") != value) {
+    logInfo "OpenSprinkler Controller is ${value}"
   }
 }
 
