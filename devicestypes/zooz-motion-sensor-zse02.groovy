@@ -20,6 +20,8 @@
    - First you will need to create a new device type in Hubitat. Log in to the hub and click on "Drivers Code" from the left menu.
    - Click "New Driver" and paste the entire contents of this file.  Click "Save" in the top right.
    - Navigate to the device you paired and choose the newly created driver as the type
+
+  //TODO: maybe implement https://docs.hubitat.com/index.php?title=Driver_Capability_List#PowerSource
    
  */
 
@@ -138,7 +140,7 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
   def result = createEvent(descriptionText: "${device.displayName} woke up", displayed: true)
   def cmds = []
   if (!isConfigured()) {
-    // we're still in the process of configuring a newly joined device
+    // new or updated device
     logInfo("Not configured")
     [result, response(configure())]
   }
