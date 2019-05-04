@@ -67,7 +67,7 @@ metadata {
     input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: true
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: true
-    input name: "pollingInterval", type: "number", range: 5..3600, title: "Polling Interval", description: "Duration in seconds in between polls", defaultValue: 60, required: true
+    input name: "pollingInterval", type: "number", range: 5..3600, title: "Polling Interval", description: "Duration in seconds between polls", defaultValue: 60, required: true
   }
 }
 
@@ -128,7 +128,7 @@ def refresh() {
   unschedule()
   state.updatedDate = now()
   api(STATUS)
-  //api(ENABLED)
+  api(ENABLED)
   customPolling()
 }
 
@@ -137,7 +137,7 @@ def open() {
   def durations = "["
   state.stations.eachWithIndex {
     station, idx ->
-    int dur
+      int dur
     if (!station.disabled) {
       def child = getChildDevice(getChildDeviceId(idx))
       dur = child.duration() == null ? 0 : child.duration()
@@ -159,7 +159,7 @@ def close() {
 }
 
 def customPolling() {
-  logTrace "customPolling(${pollingInterval}) now:${now()} state.lastUpdated:${state.lastUpdated}"
+  logTrace "customPolling(${pollingInterval}) now:${now()} state.updatedDate:${state.updatedDate}"
   if (!isConfigured()) {
     logInfo "Polling canceled. Please configure the device!"
     return
@@ -306,7 +306,7 @@ private handleStationStatus(json) {
   def valveOpen = false
   state.stations.eachWithIndex {
     station, idx ->
-    logTrace "${station} index:${idx} open:${json.sn[idx]}"
+      logTrace "${station} index:${idx} open:${json.sn[idx]}"
     //if (json.sn[idx] == 1) {
     //  logInfo "Station ${station.name} (${idx}) is open"
     //}    
@@ -373,9 +373,9 @@ private handleStationNames(json) {
 private handleEnabled(enabled) {
   logDebug "handleEnabled($enabled)"
   def value = enabled ? "on" : "off"
-  sendEvent([name: "switch", value: value, displayed: true, isStateChange: true])
   if (device.currentValue("switch") != value) {
     logInfo "OpenSprinkler Controller is ${value}"
+    sendEvent([name: "switch", value: value, displayed: true, isStateChange: true])
   }
 }
 
