@@ -42,8 +42,8 @@
  *   Double-Tap Down   2        pressed
  *   Triple-Tap Up     3        pressed
  *   Triple-Tap Down   4        pressed
- *   Hold Up           5 	      pressed
- *   Hold Down         6 	      pressed
+ *   Hold Up           5        pressed
+ *   Hold Down         6        pressed
  *   Single-Tap Up     7        pressed
  *   Single-Tap Down   8        pressed
  *   4 taps up         9        pressed
@@ -280,28 +280,33 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   logTrace "cmd: $cmd"
   logDebug "manufacturerId:   ${cmd.manufacturerId}"
   logDebug "manufacturerName: ${cmd.manufacturerName}"
-  state.manufacturer = cmd.manufacturerName
   logDebug "productId:        ${cmd.productId}"
   logDebug "productTypeId:    ${cmd.productTypeId}"
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-  updateDataValue("MSR", msr)
-  setFirmwareVersion()
-  createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: false])
+	if (!(msr.equals(getDataValue("MSR")))) {
+		updateDataValue("MSR", msr)
+		createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
+	}
+	if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
+		updateDataValue("manufacturer", cmd.manufacturerName)
+		createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+	}			
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd)"
   logTrace "cmd: $cmd"
-  //updateDataValue("applicationVersion", "${cmd.applicationVersion}")
   logDebug("received Version Report")
   logDebug "applicationVersion:      ${cmd.applicationVersion}"
   logDebug "applicationSubVersion:   ${cmd.applicationSubVersion}"
-  state.firmwareVersion = cmd.applicationVersion + '.' + cmd.applicationSubVersion
   logDebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
   logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
   logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
-  setFirmwareVersion()
-  createEvent([descriptionText: "Firmware V" + state.firmwareVersion, isStateChange: false])
+	def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
+	if (!(ver.equals(getDataValue("firmware")))) {
+		updateDataValue("firmware", ver)
+    createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
+	}	
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -702,74 +707,62 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
 
 def tapUp1Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▲")
-  [name: "button", value: "pushed", data: [buttonNumber: "7"], descriptionText: "$device.displayName Tap-Up-1 (button 7) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 7, descriptionText: "$device.displayName Tap-Up-1 (button 7) pressed", isStateChange: true]
 }
 
 def tapDown1Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▼")
-  [name: "button", value: "pushed", data: [buttonNumber: "8"], descriptionText: "$device.displayName Tap-Down-1 (button 8) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 8, descriptionText: "$device.displayName Tap-Down-1 (button 8) pressed", isStateChange: true]
 }
 
 def tapUp2Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▲▲")
-  [name: "button", value: "pushed", data: [buttonNumber: "1"], descriptionText: "$device.displayName Tap-Up-2 (button 1) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 1, descriptionText: "$device.displayName Tap-Up-2 (button 1) pressed", isStateChange: true]
 }
 
 def tapDown2Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▼▼")
-  [name: "button", value: "pushed", data: [buttonNumber: "2"], descriptionText: "$device.displayName Tap-Down-2 (button 2) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 2, descriptionText: "$device.displayName Tap-Down-2 (button 2) pressed", isStateChange: true]
 }
 
 def tapUp3Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▲▲▲")
-  [name: "button", value: "pushed", data: [buttonNumber: "3"], descriptionText: "$device.displayName Tap-Up-3 (button 3) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 3, descriptionText: "$device.displayName Tap-Up-3 (button 3) pressed", isStateChange: true]
 }
 
 def tapUp4Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▲▲▲▲")
-  [name: "button", value: "pushed", data: [buttonNumber: "9"], descriptionText: "$device.displayName Tap-Up-4 (button 9) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 9, descriptionText: "$device.displayName Tap-Up-4 (button 9) pressed", isStateChange: true]
 }
 
 def tapUp5Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▲▲▲▲▲")
-  [name: "button", value: "pushed", data: [buttonNumber: "11"], descriptionText: "$device.displayName Tap-Up-5 (button 11) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 11, descriptionText: "$device.displayName Tap-Up-5 (button 11) pressed", isStateChange: true]
 }
 
 def tapDown3Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▼▼▼")
-  [name: "button", value: "pushed", data: [buttonNumber: "4"], descriptionText: "$device.displayName Tap-Down-3 (button 4) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 4, descriptionText: "$device.displayName Tap-Down-3 (button 4) pressed", isStateChange: true]
 }
 
 def tapDown4Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▼▼▼▼")
-  [name: "button", value: "pushed", data: [buttonNumber: "10"], descriptionText: "$device.displayName Tap-Down-3 (button 10) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 10, descriptionText: "$device.displayName Tap-Down-3 (button 10) pressed", isStateChange: true]
 }
 
 def tapDown5Response(String buttonType) {
   sendEvent(name: "status", value: "Tap ▼▼▼▼▼")
-  [name: "button", value: "pushed", data: [buttonNumber: "12"], descriptionText: "$device.displayName Tap-Down-3 (button 12) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 12, descriptionText: "$device.displayName Tap-Down-3 (button 12) pressed", isStateChange: true]
 }
 
 def holdUpResponse(String buttonType) {
   sendEvent(name: "status", value: "Hold ▲")
-  [name: "button", value: "pushed", data: [buttonNumber: "5"], descriptionText: "$device.displayName Hold-Up (button 5) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 5, descriptionText: "$device.displayName Hold-Up (button 5) pressed", isStateChange: true]
 }
 
 def holdDownResponse(String buttonType) {
   sendEvent(name: "status", value: "Hold ▼")
-  [name: "button", value: "pushed", data: [buttonNumber: "6"], descriptionText: "$device.displayName Hold-Down (button 6) pressed",
-    isStateChange: true, type: "$buttonType"]
+  [name: "pushed", value: 6, descriptionText: "$device.displayName Hold-Down (button 6) pressed", isStateChange: true]
 }
 
 def tapUp1() {
@@ -818,20 +811,6 @@ def holdUp() {
 
 def holdDown() {
   sendEvent(holdDownResponse("digital"))
-}
-
-def setFirmwareVersion() {
-  def versionInfo = ''
-  if (state.manufacturer) {
-    versionInfo = state.manufacturer + ' '
-  }
-  if (state.firmwareVersion) {
-    versionInfo = versionInfo + "Firmware V" + state.firmwareVersion
-  }
-  else {
-    versionInfo = versionInfo + "Firmware unknown"
-  }
-  sendEvent(name: "firmwareVersion", value: versionInfo, isStateChange: true, displayed: false)
 }
 
 def configure() {
