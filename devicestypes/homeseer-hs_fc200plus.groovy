@@ -86,8 +86,6 @@ metadata {
     command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description: "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
     command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to 25500)"]]
 
-    command "test"
-
     fingerprint mfr: "000C", prod: "4447", model: "3036"
   }
 
@@ -205,11 +203,6 @@ metadata {
   }
 }
 
-def test() {
-  logTrace "hi!"
-  delayBetween(setPrefs(), 500)
-}
-
 def parse(String description) {
   def result = null
   logDebug("parse($description)")
@@ -253,7 +246,11 @@ private dimmerEvents(hubitat.zwave.Command cmd) {
   state.lastLevel = cmd.value
   if (cmd.value && cmd.value <= 100) {
     result << createEvent(name: "level", value: cmd.value, unit: "%")
+    result << createEvent(name: "speed", value: getFanSpeedTextFromLevel(cmd.value))
     logInfo "Level for ${device.label} is ${cmd.value}"
+  }
+  else {
+    result << createEvent(name: "speed", value: "off")
   }
   return result
 }
@@ -297,7 +294,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "applicationVersion:      ${cmd.applicationVersion}"
   logDebug "applicationSubVersion:   ${cmd.applicationSubVersion}"
   state.firmwareVersion = cmd.applicationVersion + '.' + cmd.applicationSubVersion
-  logdebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
+  logDebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
   logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
   logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
   setFirmwareVersion()
@@ -363,6 +360,7 @@ def setLevel(value) {
     sendEvent(name: "switch", value: "off")
   }
   sendEvent(name: "level", value: level, unit: "%")
+  sendEvent(name: "speed", value: getFanSpeedTextFromLevel(level))
   def result = []
 
   result += response(zwave.basicV1.basicSet(value: level))
@@ -376,6 +374,38 @@ def setLevel(value) {
 def setLevel(value, duration) {
   logDebug "setLevel(value, duration)"
   setLevel(value)
+}
+
+def setSpeed(fanspeed) {
+  logDebug "setSpeed($fanspeed)"
+  switch (fanspeed) {
+    case "low":
+      setLevel(19)
+      break
+    case "medium-low":
+      setLevel(39)
+      break
+    case "medium":
+      setLevel(59)
+      break
+    case "medium-high":
+      setLevel(79)
+      break
+    case "high":
+      setLevel(99)
+      break
+    case "on":
+      on()
+      break
+    case "off":
+      off()
+      break
+    case "auto":
+      log.warn "What does auto do?"
+    default:
+      log.warn "Speed ${fanspeed} not implemented!"
+      break
+  }
 }
 
 /*
@@ -415,9 +445,6 @@ def setStatusLed(led, color, blink) {
     state.statusled2 = 0
     state.statusled3 = 0
     state.statusled4 = 0
-    //state.statusled5 = 0
-    //state.statusled6 = 0
-    //state.statusled7 = 0
     state.blinkval = 0
   }
 
@@ -435,17 +462,6 @@ def setStatusLed(led, color, blink) {
     case 4:
       state.statusled4 = color
       break
-    /*
-    case 5:
-      state.statusled5 = color
-      break
-    case 6:
-      state.statusled6 = color
-      break
-    case 7:
-      state.statusled7 = color
-      break
-		*/
     case 0:
     case 5:
       // Special case - all LED's
@@ -453,14 +469,11 @@ def setStatusLed(led, color, blink) {
       state.statusled2 = color
       state.statusled3 = color
       state.statusled4 = color
-      //state.statusled5 = color
-      //state.statusled6 = color
-      //state.statusled7 = color
       break
 
   }
 
-  if (state.statusled1 == 0 && state.statusled2 == 0 && state.statusled3 == 0 && state.statusled4 == 0 /*&& state.statusled5 == 0 && state.statusled6 == 0 && state.statusled7 == 0*/) {
+  if (state.statusled1 == 0 && state.statusled2 == 0 && state.statusled3 == 0 && state.statusled4 == 0) {
     // no LEDS are set, put back to NORMAL mode
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 13, size: 1).format()
   }
@@ -497,17 +510,6 @@ def setStatusLed(led, color, blink) {
       case 4:
         blinkval = blinkval | 0x8
         break
-      /*
-      case 5:
-        blinkval = blinkval | 0x10
-        break
-      case 6:
-        blinkval = blinkval | 0x20
-        break
-      case 7:
-        blinkval = blinkval | 0x40
-        break
-      */
       case 0:
       case 5:
         blinkval = 0xF
@@ -535,17 +537,6 @@ def setStatusLed(led, color, blink) {
       case 4:
         blinkval = blinkval & 0x7
         break
-      /*
-      case 5:
-        blinkval = blinkval & 0xEF
-        break
-      case 6:
-        blinkval = blinkval & 0xDF
-        break
-      case 7:
-        blinkval = blinkval & 0xBF
-        break
-      */
       case 0:
       case 5:
         blinkval = 0
@@ -842,13 +833,12 @@ def setFirmwareVersion() {
 
 def configure() {
   logDebug("configure()")
-
   sendEvent(name: "numberOfButtons", value: 12, displayed: false)
   def cmds = []
-  cmds << setPrefs()
-  //cmds << zwave.switchMultilevelV1.switchMultilevelGet().format()
-  //cmds << zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
-  //cmds << zwave.versionV1.versionGet().format()
+  cmds += setPrefs()
+  cmds << zwave.switchMultilevelV1.switchMultilevelGet().format()
+  cmds << zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
+  cmds << zwave.versionV1.versionGet().format()
   delayBetween(cmds, 500)
 }
 
@@ -881,7 +871,7 @@ def setPrefs() {
         break
     }
   }
-  /*
+
   if (localcontrolramprate != null) {
     //log.debug localcontrolramprate
     def localRamprate = Math.max(Math.min(localcontrolramprate.toInteger(), 90), 0)
@@ -893,28 +883,27 @@ def setPrefs() {
     def remoteRamprate = Math.max(Math.min(remotecontrolramprate.toInteger(), 90), 0)
     cmds << zwave.configurationV2.configurationSet(configurationValue: [remoteRamprate.toInteger()], parameterNumber: 11, size: 1).format()
   }
-  
+
   if (reverseSwitch) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
   }
   else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
   }
-  
+
   if (bottomled) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
   }
   else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()
   }
-	
-	if (speedType) {
-		logInfo "Setting fan speed type to ${speedType}"
-		device.updateDataValue("speedType", speedType)
-		def value = speedType == "4 Speed" ? 1 : 0
-		cmds << zwave.configurationV2.configurationSet(configurationValue: [value], parameterNumber: 5, size: 1).format()
-	}
-  */
+
+  if (speedType) {
+    logInfo "Setting fan speed type to ${speedType}"
+    device.updateDataValue("speedType", speedType)
+    def value = speedType == "4 Speed" ? 1 : 0
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [value], parameterNumber: 5, size: 1).format()
+  }
 
   //Enable the following configuration gets to verify configuration in the logs
   //cmds << zwave.configurationV1.configurationGet(parameterNumber: 7).format()
@@ -929,8 +918,36 @@ def setPrefs() {
 def updated() {
   logDebug "updated()"
   def cmds = []
-  cmds << setPrefs()
+  cmds += setPrefs()
   delayBetween(cmds, 500)
+}
+
+def getFanSpeedTextFromLevel(int level) {
+  logDebug "getFanSpeedTextFromLevel(int $level)"
+  def result
+  switch (level) {
+    case 0:
+      result = "off"
+      break
+    case 1..19:
+      result = "low"
+      break
+    case 20..39:
+      result = "medium-low"
+      break
+    case 40..59:
+      result = "medium"
+      break
+    case 60..79:
+      result = "medium-high"
+      break
+    case 80..99:
+      result = "high"
+      break
+    default:
+      log.warn "Level $level was out of bounds"
+  }
+  return result
 }
 
 private logInfo(msg) {
