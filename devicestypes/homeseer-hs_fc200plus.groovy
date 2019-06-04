@@ -54,7 +54,7 @@
  */
 
 metadata {
-  definition(name: "HS-FC200+ Fan Controller", namespace: "codahq-hubitat	", author: "Ben Rimmasch",
+  definition(name: "HS-FC200+ Fan Controller", namespace: "codahq-hubitat", author: "Ben Rimmasch",
              importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/homeseer-hs_fc200plus.groovy") {
     capability "Switch Level"
     capability "Actuator"
