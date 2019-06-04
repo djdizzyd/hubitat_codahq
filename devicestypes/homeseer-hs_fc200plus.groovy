@@ -850,7 +850,6 @@ def configure() {
   //cmds << zwave.manufacturerSpecificV1.manufacturerSpecificGet().format()
   //cmds << zwave.versionV1.versionGet().format()
   delayBetween(cmds, 500)
-  logTrace "wtf"
 }
 
 def setPrefs() {
