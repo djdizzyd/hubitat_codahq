@@ -86,7 +86,9 @@ metadata {
     command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description: "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
     command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to 25500)"]]
 
-    fingerprint mfr: "000C", prod: "4447", model: "3036"
+    //the dimmer fingerprint mfr: "000C", prod: "4447", model: "3036"
+    fingerprint mfr: "000C", prod: "0203", model: "0001"
+    //to add new fingerprints convert dec manufacturer to hex mfr, dec deviceType to hex prod, and dec deviceId to hex model
   }
 
   simulator {
@@ -379,7 +381,7 @@ def setLevel(value, duration) {
 def setSpeed(fanspeed) {
   logDebug "setSpeed($fanspeed)"
   switch (fanspeed) {
-    case "low":
+  	case "low":
       setLevel(19)
       break
     case "medium-low":
@@ -871,7 +873,7 @@ def setPrefs() {
         break
     }
   }
-
+  
   if (localcontrolramprate != null) {
     //log.debug localcontrolramprate
     def localRamprate = Math.max(Math.min(localcontrolramprate.toInteger(), 90), 0)
@@ -883,27 +885,27 @@ def setPrefs() {
     def remoteRamprate = Math.max(Math.min(remotecontrolramprate.toInteger(), 90), 0)
     cmds << zwave.configurationV2.configurationSet(configurationValue: [remoteRamprate.toInteger()], parameterNumber: 11, size: 1).format()
   }
-
+  
   if (reverseSwitch) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
   }
   else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
   }
-
+  
   if (bottomled) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
   }
   else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()
   }
-
-  if (speedType) {
-    logInfo "Setting fan speed type to ${speedType}"
-    device.updateDataValue("speedType", speedType)
-    def value = speedType == "4 Speed" ? 1 : 0
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [value], parameterNumber: 5, size: 1).format()
-  }
+	
+	if (speedType) {
+		logInfo "Setting fan speed type to ${speedType}"
+		device.updateDataValue("speedType", speedType)
+		def value = speedType == "4 Speed" ? 1 : 0
+		cmds << zwave.configurationV2.configurationSet(configurationValue: [value], parameterNumber: 5, size: 1).format()
+	}
 
   //Enable the following configuration gets to verify configuration in the logs
   //cmds << zwave.configurationV1.configurationGet(parameterNumber: 7).format()
@@ -922,7 +924,7 @@ def updated() {
   delayBetween(cmds, 500)
 }
 
-def getFanSpeedTextFromLevel(int level) {
+def getFanSpeedTextFromLevel(int level) {  
   logDebug "getFanSpeedTextFromLevel(int $level)"
   def result
   switch (level) {
@@ -946,7 +948,7 @@ def getFanSpeedTextFromLevel(int level) {
       break
     default:
       log.warn "Level $level was out of bounds"
-  }
+  }  
   return result
 }
 
