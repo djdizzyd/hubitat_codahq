@@ -38,18 +38,18 @@
  *   Button Mappings:
  *
  *   ACTION          BUTTON#    BUTTON ACTION
- *   Double-Tap Up     1        pressed
- *   Double-Tap Down   2        pressed
- *   Triple-Tap Up     3        pressed
- *   Triple-Tap Down   4        pressed
- *   Hold Up           5        pressed
- *   Hold Down         6        pressed
- *   Single-Tap Up     7        pressed
- *   Single-Tap Down   8        pressed
- *   4 taps up         9        pressed
- *   4 taps down       10       pressed
- *   5 taps up         11       pressed
- *   5 taps down       12       pressed
+ *   Double-Tap Up     1        pushed
+ *   Double-Tap Down   2        pushed
+ *   Triple-Tap Up     3        pushed
+ *   Triple-Tap Down   4        pushed
+ *   Hold Up           5        pushed
+ *   Hold Down         6        pushed
+ *   Single-Tap Up     7        pushed
+ *   Single-Tap Down   8        pushed
+ *   4 taps up         9        pushed
+ *   4 taps down       10       pushed
+ *   5 taps up         11       pushed
+ *   5 taps down       12       pushed
  *
  */
 
@@ -78,8 +78,8 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "NUMBER", range: 1..4, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=ALL"],
-      [name: "Color*", type: "NUMBER", range: 0..8, description: "0=Off, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan, 7=White"],
+      [name: "LED*", type: "NUMBER", range: 1..5, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=ALL"],
+      [name: "Color*", type: "NUMBER", range: 0..7, description: "0=Off, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan, 7=White"],
       [name: "Blink?*", type: "NUMBER", range: 0..1, description: "0=No, 1=Yes", default: 0]
     ]
     command "setSwitchModeNormal"
