@@ -208,7 +208,7 @@ def parse(String description) {
   logDebug("parse($description)")
   if (description != "updated") {
     def cmd = zwave.parse(description, [0x20: 1, 0x26: 1, 0x70: 1])
-		logTrace "cmd: $cmd"
+    logTrace "cmd: $cmd"
     if (cmd) {
       result = zwaveEvent(cmd)
     }
@@ -277,16 +277,16 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   logDebug "productId:        ${cmd.productId}"
   logDebug "productTypeId:    ${cmd.productTypeId}"
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-	def cmds = []
+  def cmds = []
   if (!(msr.equals(getDataValue("MSR")))) {
     updateDataValue("MSR", msr)
   }
   if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
     updateDataValue("manufacturer", cmd.manufacturerName)
   }
-	cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
-	cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
-	cmds
+  cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
+  cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+  cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -302,7 +302,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   if (!(ver.equals(getDataValue("firmware")))) {
     updateDataValue("firmware", ver)
   }
-	createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
+  createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -811,7 +811,7 @@ def holdDown() {
 
 def configure() {
   logDebug("configure()")
-	cleanup()
+  cleanup()
   sendEvent(name: "numberOfButtons", value: 12, displayed: false)
   def cmds = []
   cmds += setPrefs()
@@ -824,12 +824,12 @@ def configure() {
 def setPrefs() {
   logDebug "setPrefs()"
   def cmds = []
-	
-	if (logEnable || traceLogEnable) {
-		log.warn "Debug logging is on and will be scheduled to turn off automatically in 30 minutes."
-		unschedule()
-		runIn(1800, logsOff)
-	}
+
+  if (logEnable || traceLogEnable) {
+    log.warn "Debug logging is on and will be scheduled to turn off automatically in 30 minutes."
+    unschedule()
+    runIn(1800, logsOff)
+  }
 
   if (color) {
     switch (color) {
@@ -894,9 +894,9 @@ def setPrefs() {
 }
 
 def logsOff() {
-	log.info "Turning off debug logging for device ${device.label}"
-	device.updateSetting("logEnable", [value:"false", type:"bool"])
-	device.updateSetting("traceLogEnable", [value:"false", type:"bool"])
+  log.info "Turning off debug logging for device ${device.label}"
+  device.updateSetting("logEnable", [value: "false", type: "bool"])
+  device.updateSetting("traceLogEnable", [value: "false", type: "bool"])
 }
 
 def updated() {
@@ -907,36 +907,36 @@ def updated() {
 }
 
 def installed() {
-	logDebug "installed()"
-	cleanup()
+  logDebug "installed()"
+  cleanup()
 }
 
 def cleanup() {
-	unschedule()
+  unschedule()
 
-	logDebug "cleanup()"
-	if (state.lastLevel != null) {
-		state.remove("lastLevel")
-	}
-	if (state.blinkval != null) {
-		state.remove("blinkval")
-	}
-	if (state.bin != null) {
-		state.remove("bin")
-	}
-	if (state.blinkDuration != null) {
-		state.remove("blinkDuration")
-	}
-	for (int i = 1; i <= 7; i++) {
-		if (state."statusled${i}" != null) {
-			state.remove("statusled" + i)
-		}
-	}
-	for (int i = 1; i <= 7; i++) {
-		if (state."${i}" != null) {
-			state.remove(String.valueOf(i))
-		}
-	}
+  logDebug "cleanup()"
+  if (state.lastLevel != null) {
+    state.remove("lastLevel")
+  }
+  if (state.blinkval != null) {
+    state.remove("blinkval")
+  }
+  if (state.bin != null) {
+    state.remove("bin")
+  }
+  if (state.blinkDuration != null) {
+    state.remove("blinkDuration")
+  }
+  for (int i = 1; i <= 7; i++) {
+    if (state."statusled${i}" != null) {
+      state.remove("statusled" + i)
+    }
+  }
+  for (int i = 1; i <= 7; i++) {
+    if (state."${i}" != null) {
+      state.remove(String.valueOf(i))
+    }
+  }
 }
 
 private logInfo(msg) {
