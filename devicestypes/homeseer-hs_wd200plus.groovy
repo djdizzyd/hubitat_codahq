@@ -208,6 +208,7 @@ def parse(String description) {
   logDebug("parse($description)")
   if (description != "updated") {
     def cmd = zwave.parse(description, [0x20: 1, 0x26: 1, 0x70: 1])
+		logTrace "cmd: $cmd"
     if (cmd) {
       result = zwaveEvent(cmd)
     }
@@ -276,14 +277,16 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   logDebug "productId:        ${cmd.productId}"
   logDebug "productTypeId:    ${cmd.productTypeId}"
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
+	def cmds = []
   if (!(msr.equals(getDataValue("MSR")))) {
     updateDataValue("MSR", msr)
-    createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
   }
   if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
     updateDataValue("manufacturer", cmd.manufacturerName)
-    createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
   }
+	cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
+	cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+	cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -298,8 +301,8 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
   if (!(ver.equals(getDataValue("firmware")))) {
     updateDataValue("firmware", ver)
-    createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
   }
+	createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -473,7 +476,7 @@ def setStatusLed(led, color, blink) {
   }
   else {
     // set color for specified LED
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: led.toInteger() + 20, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: led + 20, size: 1).format()
   }
 
   // check if LED should be blinking
@@ -808,6 +811,7 @@ def holdDown() {
 
 def configure() {
   logDebug("configure()")
+	cleanup()
   sendEvent(name: "numberOfButtons", value: 12, displayed: false)
   def cmds = []
   cmds += setPrefs()
@@ -888,6 +892,37 @@ def updated() {
   def cmds = []
   cmds += setPrefs()
   delayBetween(cmds, 500)
+}
+
+def installed() {
+	logDebug "installed()"
+	cleanup()
+}
+
+def cleanup() {
+	logDebug "cleanup()"
+	if (state.lastLevel != null) {
+		state.remove("lastLevel")
+	}
+	if (state.blinkval != null) {
+		state.remove("blinkval")
+	}
+	if (state.bin != null) {
+		state.remove("bin")
+	}
+	if (state.blinkDuration != null) {
+		state.remove("blinkDuration")
+	}
+	for (int i = 0; i <= 7; i++) {
+		if (state."statusled${i}" != null) {
+			state.remove("statusled${i}")
+		}
+	}
+	for (int i = 0; i <= 2; i++) {
+		if (state."${i}" != null) {
+			state.remove("${i}")
+		}
+	}
 }
 
 private logInfo(msg) {
