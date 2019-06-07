@@ -473,7 +473,7 @@ def setStatusLed(led, color, blink) {
   }
   else {
     // set color for specified LED
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: led + 20, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: led.toInteger() + 20, size: 1).format()
   }
 
   // check if LED should be blinking
