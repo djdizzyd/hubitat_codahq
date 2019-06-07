@@ -399,7 +399,7 @@ def setBlinkDurationMS(newBlinkDuration) {
   if (0 < newBlinkDuration && newBlinkDuration < 25500) {
     logDebug "setting blink duration to: ${newBlinkDuration} ms"
     state.blinkDuration = newBlinkDuration.toInteger() / 100
-    logDebug "blink duration config parameter 30 is: ${state.blinkDuration}"
+    logDebug "blink duration config (parameter 30) is: ${state.blinkDuration}"
     cmds << zwave.configurationV2.configurationSet(configurationValue: [state.blinkDuration.toInteger()], parameterNumber: 30, size: 1).format()
   } else {
     log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. 25500 ms"
@@ -407,7 +407,7 @@ def setBlinkDurationMS(newBlinkDuration) {
   return cmds
 }
 
-def setStatusLed(led, color, blink) {
+def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
   logDebug "setStatusLed($led, $color, $blink)"
   def cmds = []
 
@@ -824,6 +824,12 @@ def configure() {
 def setPrefs() {
   logDebug "setPrefs()"
   def cmds = []
+	
+	if (logEnable || traceLogEnable) {
+		log.warn "Debug logging is on and will be scheduled to turn off automatically in 30 minutes."
+		unschedule()
+		runIn(1800, logsOff)
+	}
 
   if (color) {
     switch (color) {
@@ -887,6 +893,12 @@ def setPrefs() {
   return cmds
 }
 
+def logsOff() {
+	log.info "Turning off debug logging for device ${device.label}"
+	device.updateSetting("logEnable", [value:"false", type:"bool"])
+	device.updateSetting("traceLogEnable", [value:"false", type:"bool"])
+}
+
 def updated() {
   logDebug "updated()"
   def cmds = []
@@ -900,6 +912,8 @@ def installed() {
 }
 
 def cleanup() {
+	unschedule()
+
 	logDebug "cleanup()"
 	if (state.lastLevel != null) {
 		state.remove("lastLevel")
@@ -913,14 +927,14 @@ def cleanup() {
 	if (state.blinkDuration != null) {
 		state.remove("blinkDuration")
 	}
-	for (int i = 0; i <= 7; i++) {
+	for (int i = 1; i <= 7; i++) {
 		if (state."statusled${i}" != null) {
-			state.remove("statusled${i}")
+			state.remove("statusled" + i)
 		}
 	}
-	for (int i = 0; i <= 2; i++) {
+	for (int i = 1; i <= 7; i++) {
 		if (state."${i}" != null) {
-			state.remove("${i}")
+			state.remove(String.valueOf(i))
 		}
 	}
 }
