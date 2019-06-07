@@ -504,7 +504,7 @@ def setStatusLed(led, color, blink) {
         break
       case 0:
       case 8:
-        blinkval = 0xF
+        blinkval = 0x7F
         break
     }
     cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval], parameterNumber: 31, size: 1).format()
