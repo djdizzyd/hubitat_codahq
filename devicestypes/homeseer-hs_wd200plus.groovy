@@ -471,12 +471,12 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
   if (led == 8 | led == 0) {
     for (def ledToChange = 1; ledToChange <= 7; ledToChange++) {
       // set color for all LEDs
-      cmds << zwave.configurationV2.configurationSet(configurationValue: [color.toInteger()], parameterNumber: ledToChange + 20, size: 1).format()
+      cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: ledToChange + 20, size: 1).format()
     }
   }
   else {
     // set color for specified LED
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [color.toInteger()], parameterNumber: led.toInteger() + 20, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: led.intValue() + 20, size: 1).format()
   }
 
   // check if LED should be blinking
