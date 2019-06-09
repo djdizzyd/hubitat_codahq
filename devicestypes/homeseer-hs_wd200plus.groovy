@@ -20,6 +20,8 @@
  *
  *  Changelog:
  *  1.0       2019-06-07 Initial Hubitat Version
+ *  1.0.1     2019-06-08 Fixes for some hubs not liking BigDecimals passed as configurationValue
+ *  1.0.2     2019-06-09 Small fix so that when setting LED colors on a fan and a dimmer 0 can be used for all as well as 8
  *
  *
  *	Previous Driver's Changelog:
@@ -77,7 +79,7 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "NUMBER", range: 1..8, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=LED 5, 6=LED 6, 7=LED 7, 8=ALL"],
+      [name: "LED*", type: "NUMBER", range: 0..8, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=LED 5, 6=LED 6, 7=LED 7, 0 or 8=ALL"],
       [name: "Color*", type: "NUMBER", range: 0..7, description: "0=Off, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan, 7=White"],
       [name: "Blink?*", type: "NUMBER", range: 0..1, description: "0=No, 1=Yes", default: 0]
     ]
