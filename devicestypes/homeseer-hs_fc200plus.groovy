@@ -20,6 +20,9 @@
  *
  *  Changelog:
  *  1.0       2019-05-24 Initial Hubitat Version
+ *  1.0.1     2019-06-09 Changes to bring this driver the same functionality as the dimmer
+ *                       Fixes for some hubs not liking BigDecimals passed as configurationValue
+ *                       Fixes in some descriptions where brightness was still used from original driver
  *
  *
  *	Previous Driver's Changelog:
@@ -55,7 +58,7 @@
 
 metadata {
   definition(name: "HS-FC200+ Fan Controller", namespace: "codahq-hubitat", author: "Ben Rimmasch",
-             importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/homeseer-hs_fc200plus.groovy") {
+    importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/homeseer-hs_fc200plus.groovy") {
     capability "Switch Level"
     capability "Actuator"
     capability "Indicator"
@@ -78,7 +81,7 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "NUMBER", range: 1..5, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=ALL"],
+      [name: "LED*", type: "NUMBER", range: 0..5, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 0 or 5=ALL"],
       [name: "Color*", type: "NUMBER", range: 0..7, description: "0=Off, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan, 7=White"],
       [name: "Blink?*", type: "NUMBER", range: 0..1, description: "0=No, 1=Yes", default: 0]
     ]
@@ -87,7 +90,6 @@ metadata {
     command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description: "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
     command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to 25500)"]]
 
-    //the dimmer fingerprint mfr: "000C", prod: "4447", model: "3036"
     fingerprint mfr: "000C", prod: "0203", model: "0001"
     //to add new fingerprints convert dec manufacturer to hex mfr, dec deviceType to hex prod, and dec deviceId to hex model
   }
@@ -111,8 +113,8 @@ metadata {
   }
 
   preferences {
-    input "doubleTapToFullBright", "bool", title: "Double-Tap Up sets to full brightness", defaultValue: false, displayDuringSetup: true, required: false
-    input "singleTapToFullBright", "bool", title: "Single-Tap Up sets to full brightness", defaultValue: false, displayDuringSetup: true, required: false
+    input "doubleTapToFullBright", "bool", title: "Double-Tap Up sets to full speed", defaultValue: false, displayDuringSetup: true, required: false
+    input "singleTapToFullBright", "bool", title: "Single-Tap Up sets to full speed", defaultValue: false, displayDuringSetup: true, required: false
     input "doubleTapDownToDim", "bool", title: "Double-Tap Down sets to 25% level", defaultValue: false, displayDuringSetup: true, required: false
     input "reverseSwitch", "bool", title: "Reverse Switch", defaultValue: false, displayDuringSetup: true, required: false
     input "bottomled", "bool", title: "Bottom LED On if Load is Off", defaultValue: false, displayDuringSetup: true, required: false
@@ -211,6 +213,7 @@ def parse(String description) {
   logDebug("parse($description)")
   if (description != "updated") {
     def cmd = zwave.parse(description, [0x20: 1, 0x26: 1, 0x70: 1])
+    logTrace "cmd: $cmd"
     if (cmd) {
       result = zwaveEvent(cmd)
     }
@@ -283,14 +286,16 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   logDebug "productId:        ${cmd.productId}"
   logDebug "productTypeId:    ${cmd.productTypeId}"
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
+  def cmds = []
 	if (!(msr.equals(getDataValue("MSR")))) {
 		updateDataValue("MSR", msr)
-		createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
 	}
 	if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
 		updateDataValue("manufacturer", cmd.manufacturerName)
-		createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
-	}			
+	}
+  cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
+  cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+  cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -305,8 +310,8 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
 	def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
 	if (!(ver.equals(getDataValue("firmware")))) {
 		updateDataValue("firmware", ver)
-    createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
-	}	
+	}
+  createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -436,7 +441,7 @@ def setBlinkDurationMS(newBlinkDuration) {
   if (0 < newBlinkDuration && newBlinkDuration < 25500) {
     logDebug "setting blink duration to: ${newBlinkDuration} ms"
     state.blinkDuration = newBlinkDuration.toInteger() / 100
-    logDebug "blink duration config parameter 30 is: ${state.blinkDuration}"
+    logDebug "blink duration config (parameter 30) is: ${state.blinkDuration}"
     cmds << zwave.configurationV2.configurationSet(configurationValue: [state.blinkDuration.toInteger()], parameterNumber: 30, size: 1).format()
   } else {
     log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. 25500 ms"
@@ -444,7 +449,7 @@ def setBlinkDurationMS(newBlinkDuration) {
   return cmds
 }
 
-def setStatusLed(led, color, blink) {
+def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
   logDebug "setStatusLed($led, $color, $blink)"
   def cmds = []
 
@@ -493,12 +498,12 @@ def setStatusLed(led, color, blink) {
   if (led == 5 | led == 0) {
     for (def ledToChange = 1; ledToChange <= 4; ledToChange++) {
       // set color for all LEDs
-      cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: ledToChange + 20, size: 1).format()
+      cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: ledToChange + 20, size: 1).format()
     }
   }
   else {
     // set color for specified LED
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: led + 20, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: led.intValue() + 20, size: 1).format()
   }
 
   // check if LED should be blinking
@@ -815,6 +820,7 @@ def holdDown() {
 
 def configure() {
   logDebug("configure()")
+  cleanup()
   sendEvent(name: "numberOfButtons", value: 12, displayed: false)
   def cmds = []
   cmds += setPrefs()
@@ -827,6 +833,12 @@ def configure() {
 def setPrefs() {
   logDebug "setPrefs()"
   def cmds = []
+  
+  if (logEnable || traceLogEnable) {
+    log.warn "Debug logging is on and will be scheduled to turn off automatically in 30 minutes."
+    unschedule()
+    runIn(1800, logsOff)
+  }
 
   if (color) {
     switch (color) {
@@ -897,11 +909,50 @@ def setPrefs() {
   return cmds
 }
 
+def logsOff() {
+  log.info "Turning off debug logging for device ${device.label}"
+  device.updateSetting("logEnable", [value: "false", type: "bool"])
+  device.updateSetting("traceLogEnable", [value: "false", type: "bool"])
+}
+
 def updated() {
   logDebug "updated()"
   def cmds = []
   cmds += setPrefs()
   delayBetween(cmds, 500)
+}
+
+def installed() {
+  logDebug "installed()"
+  cleanup()
+}
+
+def cleanup() {
+  unschedule()
+
+  logDebug "cleanup()"
+  if (state.lastLevel != null) {
+    state.remove("lastLevel")
+  }
+  if (state.blinkval != null) {
+    state.remove("blinkval")
+  }
+  if (state.bin != null) {
+    state.remove("bin")
+  }
+  if (state.blinkDuration != null) {
+    state.remove("blinkDuration")
+  }
+  for (int i = 1; i <= 7; i++) {
+    if (state."statusled${i}" != null) {
+      state.remove("statusled" + i)
+    }
+  }
+  for (int i = 1; i <= 7; i++) {
+    if (state."${i}" != null) {
+      state.remove(String.valueOf(i))
+    }
+  }
 }
 
 def getFanSpeedTextFromLevel(int level) {  
