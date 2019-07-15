@@ -33,7 +33,8 @@
  */
 
 metadata {
-  definition(name: "Jasco Z-Wave Plus Switch", namespace: "codahq-hubitat", author: "Ben Rimmasch") {
+  definition(name: "Jasco Z-Wave Plus Switch", namespace: "codahq-hubitat", author: "Ben Rimmasch",
+            importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/jasco-14291-switch.groovy") {
     capability "Actuator"
     capability "PushableButton"
     capability "DoubleTapableButton"
