@@ -53,16 +53,19 @@ preferences
 }
 
 metadata {
-  definition (name: "Hive Heating", namespace: "alyc100", author: "Alex Lee Yuk Cheung", ocfDeviceType: "oic.d.thermostat", mnmn: "SmartThings", vid: "SmartThings-smartthings-Z-Wave_Thermostat") {
+  definition (name: "Hive Heating", namespace: "alyc100", author: "Alex Lee Yuk Cheung", ocfDeviceType: "oic.d.thermostat", mnmn: "SmartThings",
+              vid: "SmartThings-smartthings-Z-Wave_Thermostat",
+              importUrl: "https://github.com/codahq/hubitat_codahq/blob/master/devicestypes/hive-heating.groovy"
+             ) {
     capability "Actuator"
     capability "Polling"
     capability "Refresh"
-    capability "Temperature Measurement"
+    capability "TemperatureMeasurement"
     capability "Thermostat"
-    capability "Thermostat Heating Setpoint"
-    capability "Thermostat Mode"
-    capability "Thermostat Operating State"
-    capability "Health Check"
+    capability "ThermostatHeatingSetpoint"
+    capability "ThermostatMode"
+    capability "ThermostatOperatingState"
+    capability "HealthCheck"
 
     command "heatingSetpointUp"
     command "heatingSetpointDown"
