@@ -68,7 +68,8 @@ definition(
   description: "Connect your Hive devices to Hubitat.",
   iconUrl: "https://raw.githubusercontent.com/alyc100/SmartThingsPublic/master/smartapps/alyc100/10457773_334250273417145_3395772416845089626_n.png",
   iconX2Url: "https://raw.githubusercontent.com/alyc100/SmartThingsPublic/master/smartapps/alyc100/10457773_334250273417145_3395772416845089626_n.png",
-  singleInstance: true
+  singleInstance: true,
+  importUrl: "https://github.com/codahq/hubitat_codahq/blob/master/apps/hive-connect.groovy"
 )
 
 preferences {
