@@ -159,7 +159,7 @@ def preferencesSelected() {
 }
 
 def tmaDescription() {
-  def tmaApp = findChildAppByName( appName() )
+  def tmaApp = getChildAppByLabel( appName() )
   if(tmaApp) {
     def str = ""
     str += "Thermostat Automations:"
@@ -307,7 +307,7 @@ def preferencesPAGE() {
 
 def tmaPAGE() {
   dynamicPage(name: "tmaPAGE", title: "", nextPage: !parent ? "startPage" : "tmaPAGE", install: false) {
-    def tmaApp = findChildAppByName( appName() )
+    def tmaApp = getChildAppByLabel( appName() )
     if(tmaApp) {
       section("Configured Hive Mode Automations...") { }
     } else {
@@ -1335,4 +1335,6 @@ def logErrors(options = [errorReturn: null, logObject: log], Closure c) {
   }
 }
 
-def appName() 		{ return "${parent ? "Hive Mode Automation" : "Hive (Connect)"}" }
+def appName() {
+  return parent ? "Hive Mode Automation" : "Hive (Connect)"
+}
