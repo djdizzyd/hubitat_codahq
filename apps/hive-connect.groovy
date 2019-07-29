@@ -66,6 +66,7 @@ definition(
   namespace: "alyc100",
   author: "Alex Lee Yuk Cheung",
   description: "Connect your Hive devices to Hubitat.",
+  parent: "alyc100:Hive (Connect)",
   iconUrl: "https://raw.githubusercontent.com/alyc100/SmartThingsPublic/master/smartapps/alyc100/10457773_334250273417145_3395772416845089626_n.png",
   iconX2Url: "https://raw.githubusercontent.com/alyc100/SmartThingsPublic/master/smartapps/alyc100/10457773_334250273417145_3395772416845089626_n.png",
   singleInstance: true,
@@ -104,7 +105,6 @@ def startPage() {
 
 def mainPage() {
   log.debug "mainPage"
-  app.properties.each {log.warn it}
   if (username == null || username == '' || password == null || password == '') {
     return dynamicPage(name: "mainPage", title: "", install: true, uninstall: true) {
       section {
@@ -1337,5 +1337,5 @@ def logErrors(options = [errorReturn: null, logObject: log], Closure c) {
 }
 
 def appName() {
-  return parent ? "Hive Mode Automation" : "Hive (Connect)"
+  return "${parent ? "Hive Mode Automation" : "Hive (Connect)"}"
 }
