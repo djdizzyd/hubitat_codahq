@@ -104,6 +104,7 @@ def startPage() {
 
 def mainPage() {
   log.debug "mainPage"
+  app.properties.each {log.warn it}
   if (username == null || username == '' || password == null || password == '') {
     return dynamicPage(name: "mainPage", title: "", install: true, uninstall: true) {
       section {
@@ -1024,7 +1025,7 @@ def addHeating() {
         name: state.hiveHeatingDevices[device],
         label: state.hiveHeatingDevices[device],
       ]
-      childDevice = addChildDevice(app.namespace, "Hive Heating", "$device", null, data)
+      childDevice = addChildDevice("alyc100", "Hive Heating", "$device", null, data)
       childDevice.refresh()
 
       log.debug "Created ${state.hiveHeatingDevices[device]} with id: ${device}"
@@ -1049,7 +1050,7 @@ def addHotWater() {
         name: state.hiveHotWaterDevices[device],
         label: state.hiveHotWaterDevices[device],
       ]
-      childDevice = addChildDevice(app.namespace, "Hive Hot Water", "$device", null, data)
+      childDevice = addChildDevice("alyc100", "Hive Hot Water", "$device", null, data)
       childDevice.refresh()
       log.debug "Created ${state.hiveHotWaterDevices[device]} with id: ${device}"
     } else {
@@ -1076,7 +1077,7 @@ def addBulb() {
 
       log.debug data
 
-      childDevice = addChildDevice(app.namespace, "Hive Active Light", "$device", null, data)
+      childDevice = addChildDevice("alyc100", "Hive Active Light", "$device", null, data)
       childDevice.refresh()
 
       log.debug "Created ${state.hiveBulbDevices[device]} with id: ${device}"
@@ -1104,7 +1105,7 @@ def addTunableBulb() {
 
       log.debug data
 
-      childDevice = addChildDevice(app.namespace, "Hive Active Light Tuneable", "$device", null, data)
+      childDevice = addChildDevice("alyc100", "Hive Active Light Tuneable", "$device", null, data)
       childDevice.refresh()
 
       log.debug "Created ${state.hiveTunableBulbDevices[device]} with id: ${device}"
@@ -1132,7 +1133,7 @@ def addColourBulb() {
 
       log.debug data
 
-      childDevice = addChildDevice(app.namespace, "Hive Active Light Colour Tuneable", "$device", null, data)
+      childDevice = addChildDevice("alyc100", "Hive Active Light Colour Tuneable", "$device", null, data)
       childDevice.refresh()
 
       log.debug "Created ${state.hiveColourBulb[device]} with id: ${device}"
@@ -1161,7 +1162,7 @@ def addActivePlug() {
 
       log.debug data
 
-      childDevice = addChildDevice(app.namespace, "Hive Active Plug", "$device", null, data)
+      childDevice = addChildDevice("alyc100", "Hive Active Plug", "$device", null, data)
       childDevice.refresh()
 
       log.debug "Created ${state.hiveActivePlugDevices[device]} with id: ${device}"
