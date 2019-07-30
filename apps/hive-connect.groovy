@@ -88,10 +88,12 @@ preferences {
   page(name: "tmaConfigurePAGE")
 }
 
-def apiBeekeeperUKURL(path = '/') 			 { return "https://beekeeper-uk.hivehome.com:443/1.0${path}" }
-def apiBeekeeperURL(path = '/') 			 { return "https://beekeeper.hivehome.com:443/1.0${path}" }
+def apiBeekeeperUKURL(path = '/') { return "https://beekeeper-uk.hivehome.com:443/1.0${path}" }
+def apiBeekeeperURL(path = '/') { return "https://beekeeper.hivehome.com:443/1.0${path}" }
+def showBrokenFunctionality() { return false }
 
 def startPage() {
+  log.debug "startPage"
   if (parent) {
     atomicState?.isParent = false
     tmaConfigurePAGE()
@@ -123,8 +125,10 @@ def mainPage() {
         section ("Choose your devices:") {
           href("selectDevicePAGE", title: "Devices", description: devicesSelected() ? getDevicesSelectedString() : "Tap to select devices", state: devicesSelected())
         }
-        section("Hive Mode Automations:") {
-          href "tmaPAGE", title: "Hive Mode Automations...", description: (tmaDescription() ? tmaDescription() : "Tap to Configure..."), state: (tmaDescription() ? "complete" : null)
+        if (showBrokenFunctionality()) {
+          section("Hive Mode Automations:") {
+            href "tmaPAGE", title: "Hive Mode Automations...", description: (tmaDescription() ? tmaDescription() : "Tap to Configure..."), state: (tmaDescription() ? "complete" : null)
+          }
         }
         section ("Notifications:") {
           href("preferencesPAGE", title: null, description: preferencesSelected() ? getPreferencesString() : "Tap to configure notifications", state: preferencesSelected())
