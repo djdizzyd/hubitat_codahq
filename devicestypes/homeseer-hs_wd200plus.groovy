@@ -283,12 +283,12 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   def cmds = []
   if (!(msr.equals(getDataValue("MSR")))) {
     updateDataValue("MSR", msr)
+    cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
   }
   if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
     updateDataValue("manufacturer", cmd.manufacturerName)
-  }
-  cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
-  cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+  }  
   cmds
 }
 
@@ -302,10 +302,12 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
   logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
   def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
+  def cmds = []
   if (!(ver.equals(getDataValue("firmware")))) {
     updateDataValue("firmware", ver)
+    cmds << createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
   }
-  createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
+  cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
