@@ -288,14 +288,16 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   logDebug "productId:        ${cmd.productId}"
   logDebug "productTypeId:    ${cmd.productTypeId}"
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-	if (!(msr.equals(getDataValue("MSR")))) {
-		updateDataValue("MSR", msr)
-		createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
-	}
-	if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
-		updateDataValue("manufacturer", cmd.manufacturerName)
-		createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
-	}
+  def cmds = []
+  if (!(msr.equals(getDataValue("MSR")))) {
+    updateDataValue("MSR", msr)
+    cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
+  }
+  if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
+    updateDataValue("manufacturer", cmd.manufacturerName)
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+  }
+  cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -307,11 +309,13 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
   logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
   logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
-	def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
-	if (!(ver.equals(getDataValue("firmware")))) {
-		updateDataValue("firmware", ver)
-    createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
-	}
+  def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
+  def cmds = []
+  if (!(ver.equals(getDataValue("firmware")))) {
+    updateDataValue("firmware", ver)
+    cmds << createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
+  }
+  cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
