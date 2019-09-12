@@ -23,6 +23,8 @@
  *  1.0.1     2019-06-09 Changes to bring this driver the same functionality as the dimmer
  *                       Fixes for some hubs not liking BigDecimals passed as configurationValue
  *                       Fixes in some descriptions where brightness was still used from original driver
+ *  1.0.2     2019-09-12 Fixed the delay between level gets in setLevel
+ *                       Changed some events to only fire when values change
  *
  *
  *	Previous Driver's Changelog:
@@ -286,16 +288,14 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   logDebug "productId:        ${cmd.productId}"
   logDebug "productTypeId:    ${cmd.productTypeId}"
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-  def cmds = []
 	if (!(msr.equals(getDataValue("MSR")))) {
 		updateDataValue("MSR", msr)
+		createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
 	}
 	if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
 		updateDataValue("manufacturer", cmd.manufacturerName)
+		createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
 	}
-  cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
-  cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
-  cmds
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -310,8 +310,8 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
 	def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
 	if (!(ver.equals(getDataValue("firmware")))) {
 		updateDataValue("firmware", ver)
+    createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
 	}
-  createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -374,13 +374,12 @@ def setLevel(value) {
   }
   sendEvent(name: "level", value: level, unit: "%")
   sendEvent(name: "speed", value: getFanSpeedTextFromLevel(level))
-  def result = []
 
-  result += response(zwave.basicV1.basicSet(value: level))
-  result += response("delay 5000")
-  result += response(zwave.switchMultilevelV1.switchMultilevelGet())
-  result += response("delay 5000")
-  result += response(zwave.switchMultilevelV1.switchMultilevelGet())
+  delayBetween([
+    zwave.basicV1.basicSet(value: level).format()
+    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
+    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
+  ], 5000)
 }
 
 // dummy setLevel command with duration for compatibility with Home Assistant Bridge (others?)
