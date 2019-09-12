@@ -22,6 +22,7 @@
  *  1.0       2019-06-07 Initial Hubitat Version
  *  1.0.1     2019-06-08 Fixes for some hubs not liking BigDecimals passed as configurationValue
  *  1.0.2     2019-06-09 Small fix so that when setting LED colors on a fan and a dimmer 0 can be used for all as well as 8
+ *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
  *
  *
  *	Previous Driver's Changelog:
@@ -366,13 +367,12 @@ def setLevel(value) {
     sendEvent(name: "switch", value: "off")
   }
   sendEvent(name: "level", value: level, unit: "%")
-  def result = []
 
-  result += response(zwave.basicV1.basicSet(value: level))
-  result += response("delay 5000")
-  result += response(zwave.switchMultilevelV1.switchMultilevelGet())
-  result += response("delay 5000")
-  result += response(zwave.switchMultilevelV1.switchMultilevelGet())
+  delayBetween([
+    zwave.basicV1.basicSet(value: level).format()
+    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
+    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
+  ], 5000)
 }
 
 // dummy setLevel command with duration for compatibility with Home Assistant Bridge (others?)
