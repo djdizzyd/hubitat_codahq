@@ -114,9 +114,12 @@ metadata {
   }
 
   preferences {
-    input "doubleTapToFullBright", "bool", title: "Double-Tap Up sets to full brightness", defaultValue: false, displayDuringSetup: true, required: false
-    input "singleTapToFullBright", "bool", title: "Single-Tap Up sets to full brightness", defaultValue: false, displayDuringSetup: true, required: false
-    input "doubleTapDownToDim", "bool", title: "Double-Tap Down sets to 25% level", defaultValue: false, displayDuringSetup: true, required: false
+    input "singleTapToLevel", "bool", title: "Single-Tap Up sets to level", defaultValue: false, displayDuringSetup: true, required: false
+    input("singleTapLevel", "number", title: "Single-Tap Up Level (1-99)", range: "1..99", required: false)
+    input("doubleTapUpAction", "enum", title: "Action On Double-Tap Up", options: ["Set to level", "Increase by amount"], description: "Select Action", displayDuringSetup: true, required: false)
+    input("doubleTapUpLevel", "number", title: "Double-Tap Up Level or change (1-99)", range: "1..99", required: false)
+    input("doubleTapDownAction", "enum", title: "Action On Double-Tap Down", options: ["Set to level", "Decrease by amount"], description: "Select Action", displayDuringSetup: true, required: false)
+    input("doubleTapDownLevel", "number", title: "Double-Tap Down Level or change (1-99)", range: "1..99", required: false)
     input "reverseSwitch", "bool", title: "Reverse Switch", defaultValue: false, displayDuringSetup: true, required: false
     input "bottomled", "bool", title: "Bottom LED On if Load is Off", defaultValue: false, displayDuringSetup: true, required: false
     input("localcontrolramprate", "number", title: "Press Configuration button after changing preferences\n\nLocal Ramp Rate: Duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
@@ -302,7 +305,7 @@ def setLevel(value) {
   ], 5000)
 }
 
-def setLevelNoSend(value) {
+private def setLevelNoSend(value) {
   logDebug "setLevelNoSend($value)"
   def valueaux = value as Integer
   def level = Math.max(Math.min(valueaux, 99), 0)
@@ -327,6 +330,15 @@ def setLevelNoSend(value) {
 def setLevel(value, duration) {
   logDebug "setLevel(value, duration)"
   setLevel(value)
+}
+
+private def changeLevelNoSend(value) {
+  logDebug "changeLevelNoSend($value)"
+  def lastLevel = 0
+  if (state.lastLevel != null) {
+    lastLevel = state.lastLevel
+  }
+  return setLevelNoSend(lastLevel + value)
 }
 
 /*
@@ -561,9 +573,8 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           // Press Once
           result += createEvent(tapUp1Response("physical"))
           result += createEvent([name: "switch", value: "on", type: "physical"])
-
-          if (singleTapToFullBright) {
-            result += setLevelNoSend(99)
+          if (singleTapToLevel) {
+            result += setLevelNoSend(singleTapLevel)
           }
           break
         case 1:
@@ -577,8 +588,10 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
         case 3:
           // 2 Times
           result += createEvent(tapUp2Response("physical"))
-          if (doubleTapToFullBright) {
-            result += setLevelNoSend(99)
+          if (doubleTapUpAction == "Set to level") {
+            result += setLevelNoSend(doubleTapUpLevel)
+          } else if (doubleTapUpAction == "Increase by amount") {
+            result += changeLevelNoSend(doubleTapUpLevel)
           }
           break
         case 4:
@@ -616,7 +629,12 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           break
         case 3:
           // 2 Times
-          result += createEvent(tapDown2Response("physical"))
+          result += tapDown2Response("physical").collect { createEvent(it) }
+          if (doubleTapDownAction == "Set to level") {
+            result += setLevelNoSend(doubleTapDownLevel)
+          } else if (doubleTapDownAction == "Decrease by amount") {
+            result += changeLevelNoSend(-doubleTapDownLevel)
+          }
           if (doubleTapDownToDim) {
             result += setLevelNoSend(25)
           }
@@ -662,8 +680,11 @@ def tapUp2Response(String buttonType) {
 
 def tapDown2Response(String buttonType) {
   logDebug "tapDown2Response buttonType ${buttonType}"
-  sendEvent(name: "status", value: "Tap ▼▼")
-  [name: "pushed", value: 2, descriptionText: "$device.displayName Tap-Down-2 (button 2) pressed", isStateChange: true]
+  def result = []
+  result << [name: "status", value: "Tap ▼▼"]
+  result << [name: "pushed", value: 2, descriptionText: "$device.displayName Tap-Down-2 (button 2) pressed", isStateChange: true]
+  logDebug "tapDown2Response result ${result}"
+  return result
 }
 
 def tapUp3Response(String buttonType) {
@@ -720,7 +741,7 @@ def tapUp2() {
 
 def tapDown2() {
   logDebug "tapDown2"
-  sendEvent(tapDown2Response("digital"))
+  tapDown2Response("digital").each { sendEvent(it) }
 }
 
 def tapUp3() {
