@@ -95,6 +95,19 @@ private def buttons() {
   ]
 }
 
+private def maxBlinkDuration() { 25500 }
+
+private def parameters() {
+    [
+      ledOff:             3,  // 0: LED on when switch off, 1: LED off when off
+      loadOrientation:    4,  // 0: Top of paddle is on, 1: Bottom of paddle is on
+      ledOperation:      13,  // 0: Normal, 1: Custom
+      ledNormalColor:    14,  // Sets normal color of LED. See colors.
+      ledStatusColor:    21,  // Set status color for LED. See colors.
+      ledBlinkFrequency: 31   // LED period period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
+    ]
+}
+
 metadata {
   definition(name: "HS-WD200+ Dimmer Emiller", namespace: "codahq-hubitat", author: "Eric Miller",
     importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/homeseer-hs_wd200plus.groovy") {
@@ -125,8 +138,9 @@ metadata {
     ]
     command "setSwitchModeNormal"
     command "setSwitchModeStatus"
-    command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description: "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
-    command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to 25500)"]]
+    command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description:
+        "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
+    command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to ${maxBlinkDuration()})"]]
 
     fingerprint mfr: "000C", prod: "4447", model: "3036"
     //to add new fingerprints convert dec manufacturer to hex mfr, dec deviceType to hex prod, and dec deviceId to hex model
@@ -306,6 +320,7 @@ indicatorWhenOn()
 */
 
 private def setLevelDeviceCommands(level, dimmer) {
+  state.lastLevel = level
   def cmds = [
     zwave.basicV1.basicSet(value: level).format(),
     zwave.switchMultilevelV1.switchMultilevelGet().format()
@@ -357,12 +372,7 @@ def setLevel(value) {
 private def setLevelNoSend(value) {
   def level = setLevelComputeLevel(value)
   def result = setLevelEventMaps(level).collect { createEvent(it) }
-  result << response(delayBetween([
-    zwave.basicV1.basicSet(value: level).format()
-    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
-    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
-  ], 5000))
-
+  result << response(setLevelDeviceCommands(level, true))
   return result
 }
 
@@ -375,7 +385,7 @@ def setLevel(value, duration) {
 private def changeLevelNoSend(value) {
   logDebug "changeLevelNoSend($value)"
   def lastLevel = 0
-  if (state.lastLevel != null) {
+  if (state.lastLevel) {
     lastLevel = state.lastLevel
   }
   return setLevelNoSend(lastLevel + value)
@@ -398,13 +408,14 @@ private def changeLevelNoSend(value) {
 def setBlinkDurationMS(newBlinkDuration) {
   logDebug "setBlinkDurationMS($newBlinkDuration)"
   def cmds = []
-  if (0 < newBlinkDuration && newBlinkDuration < 25500) {
+  if (0 < newBlinkDuration && newBlinkDuration < maxBlinkDuration()) {
     logDebug "setting blink duration to: ${newBlinkDuration} ms"
     state.blinkDuration = newBlinkDuration.toInteger() / 100
     logDebug "blink duration config (parameter 30) is: ${state.blinkDuration}"
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [state.blinkDuration.toInteger()], parameterNumber: 30, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [state.blinkDuration.toInteger()],
+      parameterNumber: 30, size: 1).format()
   } else {
-    log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. 25500 ms"
+    log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. ${maxBlinkDuration()} ms"
   }
   return cmds
 }
