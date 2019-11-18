@@ -58,6 +58,24 @@
  *
  */
 
+private def buttons() {
+  return [
+    [button: 1, direction: "Up", numTaps: 2],
+    [button: 2, direction: "Down", numTaps: 2],
+    [button: 3, direction: "Up", numTaps: 3],
+    [button: 4, direction: "Down", numTaps: 3],
+    // -1 value means hold
+    [button: 5, direction: "Up", numTaps: -1],
+    [button: 6, direction: "Down", numTaps: -1],
+    [button: 7, direction: "Up", numTaps: 1],
+    [button: 8, direction: "Down", numTaps: 1],
+    [button: 9, direction: "Up", numTaps: 4],
+    [button: 10, direction: "Down", numTaps: 4],
+    [button: 11, direction: "Up", numTaps: 5],
+    [button: 12, direction: "Down", numTaps: 5],
+  ]
+}
+
 metadata {
   definition(name: "HS-WD200+ Dimmer Emiller", namespace: "codahq-hubitat", author: "Eric Miller",
     importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/homeseer-hs_wd200plus.groovy") {
@@ -137,7 +155,7 @@ def parse(String description) {
   def cmd = null
   logDebug("parse($description)")
   if (description != "updated") {
-    // Use version 1 of 0x20 (), 26 (SwitchMultilevel), and 70 (Configuration)
+    // Use version 1 of 0x20 (Basic), 26 (SwitchMultilevel), and 70 (Configuration)
     cmd = zwave.parse(description, [0x20: 1, 0x26: 1, 0x70: 1])
     logTrace "cmd: $cmd"
     if (cmd) {
@@ -268,60 +286,63 @@ indicatorWhenOff()
 indicatorWhenOn()
 */
 
+private def setLevelDeviceCommands(level, dimmer) {
+  def cmds = [
+    zwave.basicV1.basicSet(value: level).format(),
+    zwave.switchMultilevelV1.switchMultilevelGet().format()
+  ]
+  if (dimmer) {
+    cmds << zwave.switchMultilevelV1.switchMultilevelGet().format()
+  }
+  delayBetween(cmds, 5000)
+}
+
 def on() {
   logDebug "on()"
   sendEvent(tapUp1Response("digital"))
-  delayBetween([
-    zwave.basicV1.basicSet(value: 0xFF).format(),
-    zwave.switchMultilevelV1.switchMultilevelGet().format()
-  ], 5000)
+  setLevelDeviceCommands(0xFF, false)
 }
 
 def off() {
   logDebug "off()"
   sendEvent(tapDown1Response("digital"))
-  delayBetween([
-    zwave.basicV1.basicSet(value: 0x00).format(),
-    zwave.switchMultilevelV1.switchMultilevelGet().format()
-  ], 5000)
+  setLevelDeviceCommands(0x00, false)
 }
 
-def setLevel(value) {
-  logDebug "setLevel($value)"
+private def setLevelComputeLevel(value) {
+  logDebug "setLevelComputeLevel($value)"
   def valueaux = value as Integer
-  def level = Math.max(Math.min(valueaux, 99), 0)
+  def level = valueaux < 0 ? 0 : valueaux > 99 ? 99 : valueaux
   logDebug "computed Level: $level"
-  if (level > 0) {
-    sendEvent(name: "switch", value: "on")
-  } else {
-    sendEvent(name: "switch", value: "off")
-  }
-  sendEvent(name: "level", value: level, unit: "%")
+  return level
+}
 
-  delayBetween([
-    zwave.basicV1.basicSet(value: level).format()
-    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
-    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
-  ], 5000)
+private def setLevelEventMaps(level) {
+  logDebug "setLevelEventMaps Level: $level"
+  def onoff = level > 0 ? "on" : "off"
+  return [
+    [name: "switch", value: onoff],
+    [name: "level", value: level, unit: "%"]
+  ]
+}
+
+// Switch level interface method
+def setLevel(value) {
+  def level = setLevelComputeLevel(value)
+  setLevelEventMaps(level).each {
+    sendEvent(it)
+  }
+  setLevelDeviceCommands(level, true)
 }
 
 private def setLevelNoSend(value) {
-  logDebug "setLevelNoSend($value)"
-  def valueaux = value as Integer
-  def level = Math.max(Math.min(valueaux, 99), 0)
-  logDebug "setLevelNoSend computed Level: $level"
-  def result = []
-  if (level > 0) {
-    result << createEvent(name: "switch", value: "on")
-  } else {
-    result << createEvent(name: "switch", value: "off")
-  }
-  result << createEvent(name: "level", value: level, unit: "%")
-  result << response(zwave.basicV1.basicSet(value: level).format())
-  result << response("delay 5000")
-  result << response(zwave.switchMultilevelV1.switchMultilevelGet())
-  result << response("delay 5000")
-  result << response(zwave.switchMultilevelV1.switchMultilevelGet())
+  def level = setLevelComputeLevel(value)
+  def result = setLevelEventMaps(level)
+  result << response(delayBetween([
+    zwave.basicV1.basicSet(value: level).format()
+    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
+    ,zwave.switchMultilevelV1.switchMultilevelGet().format()
+  ], 5000))
 
   return result
 }
@@ -571,7 +592,7 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
       switch (cmd.keyAttributes) {
         case 0:
           // Press Once
-          result += createEvent(tapUp1Response("physical"))
+          result += tapUp1Response("physical")
           result += createEvent([name: "switch", value: "on", type: "physical"])
           if (singleTapToLevel) {
             result += setLevelNoSend(singleTapLevel)
@@ -678,6 +699,21 @@ def tapUp2Response(String buttonType) {
   [name: "pushed", value: 1, descriptionText: "$device.displayName Tap-Up-2 (button 1) pressed", isStateChange: true]
 }
 
+def tapResponse(String buttonType, int buttonNum, String direction, int numTaps) {
+  logDebug "tapResponse buttonType ${buttonType}, num ${buttonNum}, dir ${direction}, numTaps ${numTaps}"
+  def result = []
+  def tapArrow = direction == "Down" ? "▼" : "▲"
+  def tapValue = ""
+  for (int ii = 0; ii < numTaps; ii++) {
+    tapValue += tapArrow
+  }
+  result << [name: "status", value: "Tap ${tapValue}"]
+  result << [name: "pushed", value: buttonNumber, descriptionText: "$device.displayName Tap-${direction}-${numTaps} (button ${buttonNum}) pressed", isStateChange: true]
+  logDebug "tapResponse result ${result}"
+  return result
+
+}
+
 def tapDown2Response(String buttonType) {
   logDebug "tapDown2Response buttonType ${buttonType}"
   def result = []
@@ -741,7 +777,7 @@ def tapUp2() {
 
 def tapDown2() {
   logDebug "tapDown2"
-  tapDown2Response("digital").each { sendEvent(it) }
+  tapResponse("digital", 2, "Down", 2).each { sendEvent(it) }
 }
 
 def tapUp3() {
