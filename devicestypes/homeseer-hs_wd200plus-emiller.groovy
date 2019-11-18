@@ -96,6 +96,7 @@ private def buttons() {
   ]
 }
 
+// Status LED numbers.
 private def leds() { 1..7 }
 private def maxBlinkPeriod() { 255 }
 private def blinkMsPerValue() { 100 }
@@ -111,29 +112,28 @@ private def params() {
       ledOperation:          13, // 0: Normal, 1: Custom
       ledNormalColor:        14, // Sets normal color of LED. See colors.
       ledStatusColor:        21, // Set status color for LED. See colors.
-      ledBlinkPeriodOld:     30, // LED period?? Existing code sometimes use 30, sometimes 31. Not sure why. 31 is current value in Homeseer user guide.
+      ledBlinkPeriodOld:     30, // LED period?? Existing code sometimes uses 30, sometimes 31. Not sure why. 31 is current value in Homeseer user guide.
       ledBlinkPeriod:        31  // LED period period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
     ]
 }
 
 private def colors() {
-  [
-    Off:     0,
-    Red:     1,
-    Green:   2,
-    Blue:    3,
-    Magenta: 4,
-    Yellow:  5,
-    Cyan:    6,
-    White:   7
-  ]
+  ["Off", "Red", "Green", "Blue", "Magenta", "Yellow", "Cyan", "White"]
 }
 
-private def normalLedColors() {
-  def ncolors = colors().clone()
-  ncolors.remove("Off")
-  ncolors.White = 0
+private def color(colorName) {
+  colors().indexOf(colorName)
+}
+
+private def normalColors() {
+  def ncolors = []
+  ncolors << colors()[-1]
+  (1..colors().size() - 2).each {ii -> ncolors << colors()[ii]}
   return ncolors
+}
+
+private def normalColor(colorName) {
+  normalColors().indexOf(colorName)
 }
 
 metadata {
@@ -161,13 +161,13 @@ metadata {
     command "holdDown"
     command "setStatusLed", [
       [name: "LED*", type: "NUMBER", range: 0..8, description: leds().collect{"${it}=LED ${it}${it==1?" (bottom)":""}"}.sort().join(", ") + ", 0 or 8=ALL"],
-      [name: "Color*", type: "ENUM", range: ["Red", "Green"], description: "Select Color"],
-      [name: "Blink?*", type: "NUMBER", range: 0..1, description: "0=No, 1=Yes", default: 0]
+      [name: "Color", type: "ENUM", constraints: colors(), description: "Select LED Color", default: "Off"],
+      [name: "Blink", type: "ENUM", constraints: ["No", "Yes"], description: "Make LED blink?"]
     ]
     command "setSwitchModeNormal"
     command "setSwitchModeStatus"
-    command "setNormalModeLedColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description:
-        normalLedColors().collect{"${it.value}=${it.key}"}.sort().join(", ")]]
+    command "setNormalModeLedColor", [[name: "Set Normal Mode LED Color", type: "ENUM", constraints: normalColors(), description:
+        "Select LED Color for Normal Mode"]]
     command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to ${maxBlinkPeriodMs()})"]]
 
     fingerprint mfr: "000C", prod: "4447", model: "3036"
@@ -203,7 +203,7 @@ metadata {
     input "bottomled", "bool", title: "Bottom LED On if Load is Off", defaultValue: false, displayDuringSetup: true, required: false
     input("localcontrolramprate", "number", title: "Press Configuration button after changing preferences\n\nLocal Ramp Rate: Duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
     input("remotecontrolramprate", "number", title: "Remote Ramp Rate: duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
-    input("color", "enum", title: "Default Normal Mode LED Color", options: normalLedColors().keySet().sort(), description: "Select Color", required: false)
+    input("color", "enum", title: "Default Normal Mode LED Color", options: normalColors(), description: "Select LED Color for Normal Mode", required: false)
     input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
@@ -448,9 +448,11 @@ def setBlinkDurationMS(newBlinkDuration) {
   return cmds
 }
 
-def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
-  logDebug "setStatusLed($led, $color, $blink)"
+def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
+  logDebug "setStatusLed($led, $colorName, $blinkChoice)"
   def cmds = []
+  def color = color(colorName)
+  def blink = blinkChoice.equals("Yes") ? 1 : 0
 
   if (!state.statusLeds) {
     state.statusLeds = Collections.nCopies(leds().size(), 0)
@@ -491,7 +493,7 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
   }
 
   // check if LED should be blinking
-  def blinkval = state.blinkval
+  def blinkval = state.blinkval == null ? 0 : state.blinkval
 
   if (blink) {
     switch (led) {
@@ -594,10 +596,10 @@ def setSwitchModeStatus() {
 /*
  * Set the color of the LEDS for normal dimming mode, shows the current dim level
  */
-def setNormalModeLedColor(color) {
-  logDebug "setNormalModeLedColor($color)"
+def setNormalModeLedColor(colorName) {
+  logDebug "setNormalModeLedColor($colorName)"
   def cmds = []
-  cmds << zwave.configurationV2.configurationSet(configurationValue: [color],
+  cmds << zwave.configurationV2.configurationSet(configurationValue: [normalColor(colorName)],
       parameterNumber: params().ledNormalColor, size: 1).format()
   logTrace "cmds: $cmds"
   delayBetween(cmds, 500)
@@ -772,7 +774,7 @@ def setPrefs() {
   }
 
   if (color) {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [normalLedColors()[color]],
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [normalColor(color)],
       parameterNumber: params().ledNormalColor, size: 1).format()
   }
 
