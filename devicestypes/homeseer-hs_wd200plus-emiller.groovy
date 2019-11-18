@@ -160,7 +160,7 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "NUMBER", range: 0..8, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=LED 5, 6=LED 6, 7=LED 7, 0 or 8=ALL"],
+      [name: "LED*", type: "NUMBER", range: 0..8, description: leds().collect{"${it}=LED ${it}${it==1?" (bottom)":""}"}.sort().join(", ") + ", 0 or 8=ALL"],
       [name: "Color*", type: "NUMBER", range: 0..7, description: colors().collect{"${it.value}=${it.key}"}.sort().join(", ")],
       [name: "Blink?*", type: "NUMBER", range: 0..1, description: "0=No, 1=Yes", default: 0]
     ]
