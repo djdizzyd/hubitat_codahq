@@ -450,6 +450,7 @@ def setBlinkDurationMS(newBlinkDuration) {
 
 def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
   logDebug "setStatusLed($led, $colorName, $blinkChoice)"
+  logDebug "setStatusLed statusLeds $state.statusLeds"
   def cmds = []
   def color = color(colorName)
   def blink = blinkChoice.equals("Yes") ? 1 : 0
@@ -462,12 +463,13 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
   /* set led # and color */
   if (0 == led || 8 == led) {
     // Special case - all LED's
-    Collections.nCopies(leds().size(), color)
+    state.statusLeds = Collections.nCopies(leds().size(), color)
   } else {
     state.statusLeds[led.toInteger() - 1] = color
   }
+  logDebug "setStatusLed updated statusLeds $state.statusLeds"
 
-  if (!state.statusLeds.find { it > 0 }) {
+  if (state.statusLeds.find { it > 0 } == null) {
     // no LEDS are set, put back to NORMAL mode
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: params().ledOperation,
         size: 1).format()
