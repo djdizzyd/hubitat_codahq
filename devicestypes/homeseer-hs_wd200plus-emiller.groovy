@@ -1,4 +1,4 @@
-/**
+statusLeds/**
  *  HomeSeer HS-WD200+ Dimmer
  *
  *  Copyright 2019 Eric G. Miller
@@ -18,13 +18,14 @@
  *
  *	Author: Eric G. Miller
  *	Date: 2019-11-16
+ *  Github: https://github.com/EricGregMiller/hubitat_codahq
+ *  Source: Fork from https://github.com/codahq/hubitat_codahq.
  *
- *  Changelog:
+ *  Ben Rimmasch Changelog:
  *  1.0       2019-06-07 Initial Hubitat Version
  *  1.0.1     2019-06-08 Fixes for some hubs not liking BigDecimals passed as configurationValue
  *  1.0.2     2019-06-09 Small fix so that when setting LED colors on a fan and a dimmer 0 can be used for all as well as 8
  *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
- *  1.0.4     2019-11-16 Clone from codahq-hubitat and remove tiles
  *
  *
  *	Previous Driver's Changelog:
@@ -80,32 +81,59 @@
 
 private def buttons() {
   return [
-    [buttonNum: 1, direction: "Up", numTaps: 2, scene: scenes().up, keyAttribute: ka().tap2],
-    [buttonNum: 2, direction: "Down", numTaps: 2, scene: scenes().down, keyAttribute: ka().tap2],
-    [buttonNum: 3, direction: "Up", numTaps: 3, scene: scenes().up, keyAttribute: ka().tap3],
-    [buttonNum: 4, direction: "Down", numTaps: 3, scene: scenes().down, keyAttribute: ka().tap3],
-    [buttonNum: 5, direction: "Up", numTaps: hold(), scene: scenes().up, keyAttribute: ka().hold],
-    [buttonNum: 6, direction: "Down", numTaps: hold(), scene: scenes().down, keyAttribute: ka().hold],
-    [buttonNum: 7, direction: "Up", numTaps: 1, scene: scenes().up, keyAttribute: ka().tap1],
-    [buttonNum: 8, direction: "Down", numTaps: 1, scene: scenes().down, keyAttribute: ka().tap1],
-    [buttonNum: 9, direction: "Up", numTaps: 4, scene: scenes().up, keyAttribute: ka().tap4],
-    [buttonNum: 10, direction: "Down", numTaps: 4, scene: scenes().down, keyAttribute: ka().tap4],
-    [buttonNum: 11, direction: "Up", numTaps: 5, scene: scenes().up, keyAttribute: ka().tap5],
-    [buttonNum: 12, direction: "Down", numTaps: 5, scene: scenes().down, keyAttribute: ka().tap5],
+    [buttonNum: 1, direction: "Up",    numTaps: 2,      scene: scenes().up,   keyAttribute: ka().tap2],
+    [buttonNum: 2, direction: "Down",  numTaps: 2,      scene: scenes().down, keyAttribute: ka().tap2],
+    [buttonNum: 3, direction: "Up",    numTaps: 3,      scene: scenes().up,   keyAttribute: ka().tap3],
+    [buttonNum: 4, direction: "Down",  numTaps: 3,      scene: scenes().down, keyAttribute: ka().tap3],
+    [buttonNum: 5, direction: "Up",    numTaps: hold(), scene: scenes().up,   keyAttribute: ka().hold],
+    [buttonNum: 6, direction: "Down",  numTaps: hold(), scene: scenes().down, keyAttribute: ka().hold],
+    [buttonNum: 7, direction: "Up",    numTaps: 1,      scene: scenes().up,   keyAttribute: ka().tap1],
+    [buttonNum: 8, direction: "Down",  numTaps: 1,      scene: scenes().down, keyAttribute: ka().tap1],
+    [buttonNum: 9, direction: "Up",    numTaps: 4,      scene: scenes().up,   keyAttribute: ka().tap4],
+    [buttonNum: 10, direction: "Down", numTaps: 4,      scene: scenes().down, keyAttribute: ka().tap4],
+    [buttonNum: 11, direction: "Up",   numTaps: 5,      scene: scenes().up,   keyAttribute: ka().tap5],
+    [buttonNum: 12, direction: "Down", numTaps: 5,      scene: scenes().down, keyAttribute: ka().tap5],
   ]
 }
 
-private def maxBlinkDuration() { 25500 }
+private def leds() { 1..7 }
+private def maxBlinkPeriod() { 255 }
+private def blinkMsPerValue() { 100 }
+private def maxBlinkPeriodMs() { maxBlinkPeriod() * blinkMsPerValue() }
 
-private def parameters() {
+private def params() {
     [
-      ledOff:             3,  // 0: LED on when switch off, 1: LED off when off
-      loadOrientation:    4,  // 0: Top of paddle is on, 1: Bottom of paddle is on
-      ledOperation:      13,  // 0: Normal, 1: Custom
-      ledNormalColor:    14,  // Sets normal color of LED. See colors.
-      ledStatusColor:    21,  // Set status color for LED. See colors.
-      ledBlinkFrequency: 31   // LED period period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
+      ledOff:                 3, // 0: LED on when switch off, 1: LED off when off
+      loadOrientation:        4, // 0: Top of paddle is on, 1: Bottom of paddle is on
+      configVerify:       7..10, // From code
+      remoteControlRampRate: 11, // From existing code. Not in current doc.
+      localControlRampRate:  12, // From existing code. Not in current doc.
+      ledOperation:          13, // 0: Normal, 1: Custom
+      ledNormalColor:        14, // Sets normal color of LED. See colors.
+      ledStatusColor:        21, // Set status color for LED. See colors.
+      ledBlinkPeriodOld:     30, // LED period?? Existing code sometimes use 30, sometimes 31. Not sure why. 31 is current value in Homeseer user guide.
+      ledBlinkPeriod:        31  // LED period period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
     ]
+}
+
+private def colors() {
+  [
+    Off:     0,
+    Red:     1,
+    Green:   2,
+    Blue:    3,
+    Magenta: 4,
+    Yellow:  5,
+    Cyan:    6,
+    White:   7
+  ]
+}
+
+private def normalLedColors() {
+  def ncolors = colors().clone()
+  ncolors.remove("Off")
+  ncolors.White = 0
+  return ncolors
 }
 
 metadata {
@@ -133,14 +161,14 @@ metadata {
     command "holdDown"
     command "setStatusLed", [
       [name: "LED*", type: "NUMBER", range: 0..8, description: "1=LED 1 (bottom), 2=LED 2, 3=LED 3, 4=LED 4, 5=LED 5, 6=LED 6, 7=LED 7, 0 or 8=ALL"],
-      [name: "Color*", type: "NUMBER", range: 0..7, description: "0=Off, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan, 7=White"],
+      [name: "Color*", type: "NUMBER", range: 0..7, description: colors().collect{"${it.value}=${it.key}"}.sort().join(", ")],
       [name: "Blink?*", type: "NUMBER", range: 0..1, description: "0=No, 1=Yes", default: 0]
     ]
     command "setSwitchModeNormal"
     command "setSwitchModeStatus"
-    command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description:
-        "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
-    command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to ${maxBlinkDuration()})"]]
+    command "setNormalModeLedColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description:
+        normalLedColors().collect{"${it.value}=${it.key}"}.sort().join(", ")]]
+    command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to ${maxBlinkPeriodMs()})"]]
 
     fingerprint mfr: "000C", prod: "4447", model: "3036"
     //to add new fingerprints convert dec manufacturer to hex mfr, dec deviceType to hex prod, and dec deviceId to hex model
@@ -175,7 +203,7 @@ metadata {
     input "bottomled", "bool", title: "Bottom LED On if Load is Off", defaultValue: false, displayDuringSetup: true, required: false
     input("localcontrolramprate", "number", title: "Press Configuration button after changing preferences\n\nLocal Ramp Rate: Duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
     input("remotecontrolramprate", "number", title: "Remote Ramp Rate: duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
-    input("color", "enum", title: "Default LED Color", options: ["White", "Red", "Green", "Blue", "Magenta", "Yellow", "Cyan"], description: "Select Color", required: false)
+    input("color", "enum", title: "Default Normal Mode LED Color", options: normalLedColors().keySet().sort(), description: "Select Color", required: false)
     input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
@@ -408,14 +436,14 @@ private def changeLevelNoSend(value) {
 def setBlinkDurationMS(newBlinkDuration) {
   logDebug "setBlinkDurationMS($newBlinkDuration)"
   def cmds = []
-  if (0 < newBlinkDuration && newBlinkDuration < maxBlinkDuration()) {
+  if (0 < newBlinkDuration && newBlinkDuration < maxBlinkPeriodMs()) {
     logDebug "setting blink duration to: ${newBlinkDuration} ms"
-    state.blinkDuration = newBlinkDuration.toInteger() / 100
-    logDebug "blink duration config (parameter 30) is: ${state.blinkDuration}"
+    state.blinkDuration = newBlinkDuration.toInteger() / blinkMsPerValue()
+    logDebug "blink duration config (parameter ${params().ledBlinkPeriodOld}) is: ${state.blinkDuration}"
     cmds << zwave.configurationV2.configurationSet(configurationValue: [state.blinkDuration.toInteger()],
-      parameterNumber: 30, size: 1).format()
+      parameterNumber: params().ledBlinkPeriodOld, size: 1).format()
   } else {
-    log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. ${maxBlinkDuration()} ms"
+    log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. ${maxBlinkPeriodMs()} ms"
   }
   return cmds
 }
@@ -424,72 +452,42 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
   logDebug "setStatusLed($led, $color, $blink)"
   def cmds = []
 
-  if (state.statusled1 == null) {
-    state.statusled1 = 0
-    state.statusled2 = 0
-    state.statusled3 = 0
-    state.statusled4 = 0
-    state.statusled5 = 0
-    state.statusled6 = 0
-    state.statusled7 = 0
+  if (!state.statusLeds) {
+    state.statusLeds = Collections.nCopies(leds().size(), 0)
     state.blinkval = 0
   }
 
   /* set led # and color */
-  switch (led) {
-    case 1:
-      state.statusled1 = color
-      break
-    case 2:
-      state.statusled2 = color
-      break
-    case 3:
-      state.statusled3 = color
-      break
-    case 4:
-      state.statusled4 = color
-      break
-    case 5:
-      state.statusled5 = color
-      break
-    case 6:
-      state.statusled6 = color
-      break
-    case 7:
-      state.statusled7 = color
-      break
-    case 0:
-    case 8:
-      // Special case - all LED's
-      state.statusled1 = color
-      state.statusled2 = color
-      state.statusled3 = color
-      state.statusled4 = color
-      state.statusled5 = color
-      state.statusled6 = color
-      state.statusled7 = color
-      break
-
+  if (0 == led || 8 == led) {
+    // Special case - all LED's
+    Collections.nCopies(leds().size(), color)
+  } else {
+    state.statusLeds[led.toInteger() - 1] = color
   }
 
-  if (state.statusled1 == 0 && state.statusled2 == 0 && state.statusled3 == 0 && state.statusled4 == 0 && state.statusled5 == 0 && state.statusled6 == 0 && state.statusled7 == 0) {
+  if (!state.statusLeds.find { it > 0 }) {
     // no LEDS are set, put back to NORMAL mode
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 13, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: params().ledOperation,
+        size: 1).format()
   }
   else {
     // at least one LED is set, put to status mode
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 13, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: params().ledOperation,
+        size: 1).format()
   }
 
+  def ledParamBase = params().ledStatusColor - 1
   if (led == 8 | led == 0) {
-    for (def ledToChange = 1; ledToChange <= 7; ledToChange++) {
+    leds().each {
       // set color for all LEDs
-      cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: ledToChange + 20, size: 1).format()
+      cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()],
+          parameterNumber: it + ledParamBase, size: 1).format()
     }
   }
   else {
     // set color for specified LED
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: led.intValue() + 20, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()],
+        parameterNumber: led.intValue() + ledParamBase, size: 1).format()
   }
 
   // check if LED should be blinking
@@ -523,11 +521,13 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
         blinkval = 0x7F
         break
     }
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval], parameterNumber: 31, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
+        parameterNumber: params().ledBlinkPeriod, size: 1).format()
     state.blinkval = blinkval
     // set blink frequency if not already set, 5=500ms
     if (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > 255) {
-      cmds << zwave.configurationV2.configurationSet(configurationValue: [5], parameterNumber: 30, size: 1).format()
+      cmds << zwave.configurationV2.configurationSet(configurationValue: [5],
+        parameterNumber: params().ledBlinkPeriodOld, size: 1).format()
     }
   }
   else {
@@ -559,7 +559,8 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
         blinkval = 0
         break
     }
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval], parameterNumber: 31, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
+        parameterNumber: params().ledBlinkPeriod, size: 1).format()
     state.blinkval = blinkval
   }
   logTrace "cmds: $cmds"
@@ -573,7 +574,8 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
 def setSwitchModeNormal() {
   logDebug "setSwitchModeNormal()"
   def cmds = []
-  cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 13, size: 1).format()
+  cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: params().ledOperation,
+      size: 1).format()
   delayBetween(cmds, 500)
 }
 
@@ -584,17 +586,19 @@ def setSwitchModeNormal() {
 def setSwitchModeStatus() {
   logDebug "setSwitchModeStatus()"
   def cmds = []
-  cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 13, size: 1).format()
+  cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: params().ledOperation,
+      size: 1).format()
   delayBetween(cmds, 500)
 }
 
 /*
  * Set the color of the LEDS for normal dimming mode, shows the current dim level
  */
-def setDefaultColor(color) {
-  logDebug "setDefaultColor($color)"
+def setNormalModeLedColor(color) {
+  logDebug "setNormalModeLedColor($color)"
   def cmds = []
-  cmds << zwave.configurationV2.configurationSet(configurationValue: [color], parameterNumber: 14, size: 1).format()
+  cmds << zwave.configurationV2.configurationSet(configurationValue: [color],
+      parameterNumber: params().ledNormalColor, size: 1).format()
   logTrace "cmds: $cmds"
   delayBetween(cmds, 500)
 }
@@ -748,7 +752,7 @@ def holdDown() {
 def configure() {
   logDebug("configure()")
   cleanup()
-  sendEvent(name: "numberOfButtons", value: 12, displayed: false)
+  sendEvent(name: "numberOfButtons", value: buttons().size(), displayed: false)
   def cmds = []
   cmds += setPrefs()
   cmds << zwave.switchMultilevelV1.switchMultilevelGet().format()
@@ -768,62 +772,47 @@ def setPrefs() {
   }
 
   if (color) {
-    switch (color) {
-      case "White":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 14, size: 1).format()
-        break
-      case "Red":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 14, size: 1).format()
-        break
-      case "Green":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [2], parameterNumber: 14, size: 1).format()
-        break
-      case "Blue":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [3], parameterNumber: 14, size: 1).format()
-        break
-      case "Magenta":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [4], parameterNumber: 14, size: 1).format()
-        break
-      case "Yellow":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [5], parameterNumber: 14, size: 1).format()
-        break
-      case "Cyan":
-        cmds << zwave.configurationV2.configurationSet(configurationValue: [6], parameterNumber: 14, size: 1).format()
-        break
-    }
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [normalLedColors()[color]],
+      parameterNumber: params().ledNormalColor, size: 1).format()
   }
 
   if (localcontrolramprate != null) {
     //logDebug localcontrolramprate
     def localRamprate = Math.max(Math.min(localcontrolramprate.toInteger(), 90), 0)
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [localRamprate.toInteger()], parameterNumber: 12, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [localRamprate.toInteger()],
+        parameterNumber: params().localControlRampRate, size: 1).format()
   }
 
   if (remotecontrolramprate != null) {
     //logDebug remotecontrolramprate
     def remoteRamprate = Math.max(Math.min(remotecontrolramprate.toInteger(), 90), 0)
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [remoteRamprate.toInteger()], parameterNumber: 11, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [remoteRamprate.toInteger()],
+       parameterNumber: params().remoteControlRampRate, size: 1).format()
   }
 
   if (reverseSwitch) {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: params().loadOrientation,
+        size: 1).format()
   }
   else {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: params().loadOrientation,
+        size: 1).format()
   }
 
   if (bottomled) {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: params().ledOff,
+        size: 1).format()
   }
   else {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: params().ledOff,
+        size: 1).format()
   }
 
   //Enable the following configuration gets to verify configuration in the logs
-  //cmds << zwave.configurationV1.configurationGet(parameterNumber: 7).format()
-  //cmds << zwave.configurationV1.configurationGet(parameterNumber: 8).format()
-  //cmds << zwave.configurationV1.configurationGet(parameterNumber: 9).format()
-  //cmds << zwave.configurationV1.configurationGet(parameterNumber: 10).format()
+  //cmds << zwave.configurationV1.configurationGet(parameterNumber: params().configVerify[0]).format()
+  //cmds << zwave.configurationV1.configurationGet(parameterNumber: params().configVerify[1]).format()
+  //cmds << zwave.configurationV1.configurationGet(parameterNumber: params().configVerify[2]).format()
+  //cmds << zwave.configurationV1.configurationGet(parameterNumber: params().configVerify[3]).format()
 
   logTrace "cmds: $cmds"
   return cmds
@@ -863,11 +852,8 @@ def cleanup() {
   if (state.blinkDuration != null) {
     state.remove("blinkDuration")
   }
-  for (int i = 1; i <= 7; i++) {
-    if (state."statusled${i}" != null) {
-      state.remove("statusled" + i)
-    }
-  }
+  state.statusLeds = Collections.nCopies(leds().size(), 0)
+
   for (int i = 1; i <= 7; i++) {
     if (state."${i}" != null) {
       state.remove(String.valueOf(i))
