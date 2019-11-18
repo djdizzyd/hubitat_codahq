@@ -1,4 +1,4 @@
-statusLeds/**
+/**
  *  HomeSeer HS-WD200+ Dimmer
  *
  *  Copyright 2019 Eric G. Miller
@@ -59,11 +59,17 @@ statusLeds/**
  *
  */
 
- private def scenes() {
+/**
+ * Scene values returned with switch events
+ */
+private def scenes() {
    return [up: 1, down: 2]
- }
+}
 
- private def ka() {
+/**
+ * Key attribute values returned with switch events
+ */
+private def ka() {
    [
      tap1: 0,
      unknown: 1,
@@ -73,12 +79,17 @@ statusLeds/**
      tap4: 5,
      tap5: 6
    ]
- }
+}
 
- private def hold() {
-   return -1
- }
+/**
+ * Special value for hold "number of taps"
+ */
+private def hold() { -1 }
 
+/**
+ * Association of buttons numbers with direction, taps, scene, and key attribute
+ * It should be possible to change button number simply by editing this map.
+ */
 private def buttons() {
   return [
     [buttonNum: 1, direction: "Up",    numTaps: 2,      scene: scenes().up,   keyAttribute: ka().tap2],
@@ -98,10 +109,16 @@ private def buttons() {
 
 // Status LED numbers.
 private def leds() { 1..7 }
+// Maximum LED blink value on switch
 private def maxBlinkPeriod() { 255 }
+// Conversion factor from switch blink value to ms (Each value is 100ms.)
 private def blinkMsPerValue() { 100 }
+// Maximum LED blink value in ms (used for user interface)
 private def maxBlinkPeriodMs() { maxBlinkPeriod() * blinkMsPerValue() }
 
+/**
+ * Parameters used by switch to control switch behavior LEDs
+ */
 private def params() {
     [
       ledOff:                 3, // 0: LED on when switch off, 1: LED off when off
@@ -117,14 +134,23 @@ private def params() {
     ]
 }
 
+/**
+ * LED status colors
+ */
 private def colors() {
   ["Off", "Red", "Green", "Blue", "Magenta", "Yellow", "Cyan", "White"]
 }
 
+/**
+ * Color number of a status color name
+ */
 private def color(colorName) {
   colors().indexOf(colorName)
 }
 
+/**
+ * LED normal mode colors. Slightly different than status because no off and white is zero.
+ */
 private def normalColors() {
   def ncolors = []
   ncolors << colors()[-1]
@@ -132,10 +158,16 @@ private def normalColors() {
   return ncolors
 }
 
+/**
+ * Color number of a normal color name
+ */
 private def normalColor(colorName) {
   normalColors().indexOf(colorName)
 }
 
+/**
+* Standard device handler metadata
+*/
 metadata {
   definition(name: "HS-WD200+ Dimmer Emiller", namespace: "codahq-hubitat", author: "Eric Miller",
     importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/homeseer-hs_wd200plus.groovy") {
@@ -211,6 +243,9 @@ metadata {
 
 }
 
+/**
+ * Method which handles all messages from switch
+*/
 def parse(String description) {
   def result = null
   def cmd = null
