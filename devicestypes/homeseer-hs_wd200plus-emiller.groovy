@@ -60,19 +60,19 @@
 
 private def buttons() {
   return [
-    [button: 1, direction: "Up", numTaps: 2],
-    [button: 2, direction: "Down", numTaps: 2],
-    [button: 3, direction: "Up", numTaps: 3],
-    [button: 4, direction: "Down", numTaps: 3],
+    [buttonNum: 1, direction: "Up", numTaps: 2, scene: 1, keyAttribute: 3],
+    [buttonNum: 2, direction: "Down", numTaps: 2, scene: 2, keyAttribute: 3],
+    [buttonNum: 3, direction: "Up", numTaps: 3, scene: 1, keyAttribute: 4],
+    [buttonNum: 4, direction: "Down", numTaps: 3, scene: 2, keyAttribute: 4],
     // -1 value means hold
-    [button: 5, direction: "Up", numTaps: -1],
-    [button: 6, direction: "Down", numTaps: -1],
-    [button: 7, direction: "Up", numTaps: 1],
-    [button: 8, direction: "Down", numTaps: 1],
-    [button: 9, direction: "Up", numTaps: 4],
-    [button: 10, direction: "Down", numTaps: 4],
-    [button: 11, direction: "Up", numTaps: 5],
-    [button: 12, direction: "Down", numTaps: 5],
+    [buttonNum: 5, direction: "Up", numTaps: -1, scene: 1, keyAttribute: 2],
+    [buttonNum: 6, direction: "Down", numTaps: -1, scene: 2, keyAttribute: 2],
+    [buttonNum: 7, direction: "Up", numTaps: 1, scene: 1, keyAttribute: 0],
+    [buttonNum: 8, direction: "Down", numTaps: 1, scene: 2, keyAttribute: 0],
+    [buttonNum: 9, direction: "Up", numTaps: 4, scene: 1, keyAttribute: 5],
+    [buttonNum: 10, direction: "Down", numTaps: 4, scene: 2, keyAttribute: 5],
+    [buttonNum: 11, direction: "Up", numTaps: 5, scene: 1, keyAttribute: 6],
+    [buttonNum: 12, direction: "Down", numTaps: 5, scene: 2, keyAttribute: 6],
   ]
 }
 
@@ -299,13 +299,13 @@ private def setLevelDeviceCommands(level, dimmer) {
 
 def on() {
   logDebug "on()"
-  sendEvent(tapUp1Response("digital"))
+  tapResponse("digital", 1, "Up").each { sendEvent(it) }
   setLevelDeviceCommands(0xFF, false)
 }
 
 def off() {
   logDebug "off()"
-  sendEvent(tapDown1Response("digital"))
+  tapResponse("digital", 1, "Down").each { sendEvent(it) }
   setLevelDeviceCommands(0x00, false)
 }
 
@@ -592,7 +592,7 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
       switch (cmd.keyAttributes) {
         case 0:
           // Press Once
-          result += tapUp1Response("physical")
+          result += tapResponse("physical", cmd.sceneNumber, cmd.keyAttributes).collect { createEvent(it) }
           result += createEvent([name: "switch", value: "on", type: "physical"])
           if (singleTapToLevel) {
             result += setLevelNoSend(singleTapLevel)
@@ -608,24 +608,18 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           break
         case 3:
           // 2 Times
-          result += createEvent(tapUp2Response("physical"))
-          if (doubleTapUpAction == "Set to level") {
+          result += tapResponse("physical", cmd.sceneNumber, cmd.keyAttributes).collect { createEvent(it) }
+          if (doubleTapUpAction.equals("Set to level")) {
             result += setLevelNoSend(doubleTapUpLevel)
-          } else if (doubleTapUpAction == "Increase by amount") {
+          } else if (doubleTapUpAction.equals("Increase by amount")) {
             result += changeLevelNoSend(doubleTapUpLevel)
           }
           break
         case 4:
-          // 3 times
-          result = createEvent(tapUp3Response("physical"))
-          break
         case 5:
-          // 4 times
-          result = createEvent(tapUp4Response("physical"))
-          break
         case 6:
-          // 5 times
-          result = createEvent(tapUp5Response("physical"))
+          // 3 times
+          result += tapResponse("physical", cmd.sceneNumber, cmd.keyAttributes).collect { createEvent(it) }
           break
         default:
           logDebug("unexpected up press keyAttribute: $cmd.keyAttributes")
@@ -637,7 +631,7 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
       switch (cmd.keyAttributes) {
         case 0:
           // Press Once
-          result += createEvent(tapDown1Response("physical"))
+          result += tapResponse("physical", cmd.sceneNumber, cmd.keyAttributes).collect { createEvent(it) }
           result += createEvent([name: "switch", value: "off", type: "physical"])
           break
         case 1:
@@ -650,10 +644,10 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           break
         case 3:
           // 2 Times
-          result += tapDown2Response("physical").collect { createEvent(it) }
-          if (doubleTapDownAction == "Set to level") {
+          result += tapResponse("physical", cmd.sceneNumber, cmd.keyAttributes).collect { createEvent(it) }
+          if (doubleTapDownAction.equals("Set to level")) {
             result += setLevelNoSend(doubleTapDownLevel)
-          } else if (doubleTapDownAction == "Decrease by amount") {
+          } else if (doubleTapDownAction.equals("Decrease by amount")) {
             result += changeLevelNoSend(-doubleTapDownLevel)
           }
           if (doubleTapDownToDim) {
@@ -661,16 +655,9 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           }
           break
         case 4:
-          // 3 Times
-          result = createEvent(tapDown3Response("physical"))
-          break
         case 5:
-          // 4 Times
-          result = createEvent(tapDown4Response("physical"))
-          break
         case 6:
-          // 5 Times
-          result = createEvent(tapDown5Response("physical"))
+          result += tapResponse("physical", cmd.sceneNumber, cmd.keyAttributes).collect { createEvent(it) }
           break
         default:
           logDebug("unexpected down press keyAttribute: $cmd.keyAttributes")
@@ -684,73 +671,33 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
   return result
 }
 
-def tapUp1Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▲")
-  [name: "pushed", value: 7, descriptionText: "$device.displayName Tap-Up-1 (button 7) pressed", isStateChange: true]
-}
-
-def tapDown1Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▼")
-  [name: "pushed", value: 8, descriptionText: "$device.displayName Tap-Down-1 (button 8) pressed", isStateChange: true]
-}
-
-def tapUp2Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▲▲")
-  [name: "pushed", value: 1, descriptionText: "$device.displayName Tap-Up-2 (button 1) pressed", isStateChange: true]
-}
-
 def tapResponse(String buttonType, int buttonNum, String direction, int numTaps) {
   logDebug "tapResponse buttonType ${buttonType}, num ${buttonNum}, dir ${direction}, numTaps ${numTaps}"
   def result = []
-  def tapArrow = direction == "Down" ? "▼" : "▲"
+  def tapArrow = direction.equals("Down") ? "▼" : "▲"
   def tapValue = ""
   for (int ii = 0; ii < numTaps; ii++) {
     tapValue += tapArrow
   }
   result << [name: "status", value: "Tap ${tapValue}"]
-  result << [name: "pushed", value: buttonNumber, descriptionText: "$device.displayName Tap-${direction}-${numTaps} (button ${buttonNum}) pressed", isStateChange: true]
+  result << [name: "pushed", value: buttonNum, descriptionText: "$device.displayName Tap-${direction}-${numTaps} (button ${buttonNum}) pressed", isStateChange: true]
   logDebug "tapResponse result ${result}"
   return result
 
 }
 
-def tapDown2Response(String buttonType) {
-  logDebug "tapDown2Response buttonType ${buttonType}"
-  def result = []
-  result << [name: "status", value: "Tap ▼▼"]
-  result << [name: "pushed", value: 2, descriptionText: "$device.displayName Tap-Down-2 (button 2) pressed", isStateChange: true]
-  logDebug "tapDown2Response result ${result}"
-  return result
+def tapResponse(String buttonType, int scene, int keyAttribute) {
+  def button = buttons().find { scene == it.scene && keyAttribute == it.keyAttribute }
+  if (button) {
+    return tapResponse(buttonType, button.buttonNum, button.direction, button.numTaps)
+  }
 }
 
-def tapUp3Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▲▲▲")
-  [name: "pushed", value: 3, descriptionText: "$device.displayName Tap-Up-3 (button 3) pressed", isStateChange: true]
-}
-
-def tapUp4Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▲▲▲▲")
-  [name: "pushed", value: 9, descriptionText: "$device.displayName Tap-Up-4 (button 9) pressed", isStateChange: true]
-}
-
-def tapUp5Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▲▲▲▲▲")
-  [name: "pushed", value: 11, descriptionText: "$device.displayName Tap-Up-5 (button 11) pressed", isStateChange: true]
-}
-
-def tapDown3Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▼▼▼")
-  [name: "pushed", value: 4, descriptionText: "$device.displayName Tap-Down-3 (button 4) pressed", isStateChange: true]
-}
-
-def tapDown4Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▼▼▼▼")
-  [name: "pushed", value: 10, descriptionText: "$device.displayName Tap-Down-3 (button 10) pressed", isStateChange: true]
-}
-
-def tapDown5Response(String buttonType) {
-  sendEvent(name: "status", value: "Tap ▼▼▼▼▼")
-  [name: "pushed", value: 12, descriptionText: "$device.displayName Tap-Down-3 (button 12) pressed", isStateChange: true]
+def tapResponse(String buttonType, int numTaps, String direction) {
+  def button = buttons().find { numTaps == it.numTaps && direction.equals(it.direction) }
+  if (button) {
+    return tapResponse(buttonType, button.buttonNum, button.direction, button.numTaps)
+  }
 }
 
 def holdUpResponse(String buttonType) {
@@ -764,44 +711,43 @@ def holdDownResponse(String buttonType) {
 }
 
 def tapUp1() {
-  sendEvent(tapUp1Response("digital"))
+  tapResponse("digital", 1, "Up").each { sendEvent(it) }
 }
 
 def tapDown1() {
-  sendEvent(tapDown1Response("digital"))
+  tapResponse("digital", 1, "Down").each { sendEvent(it) }
 }
 
 def tapUp2() {
-  sendEvent(tapUp2Response("digital"))
+  tapResponse("digital", 2, "Up").each { sendEvent(it) }
 }
 
 def tapDown2() {
-  logDebug "tapDown2"
-  tapResponse("digital", 2, "Down", 2).each { sendEvent(it) }
+  tapResponse("digital", 2, "Down").each { sendEvent(it) }
 }
 
 def tapUp3() {
-  sendEvent(tapUp3Response("digital"))
+  tapResponse("digital", 3, "Up").each { sendEvent(it) }
 }
 
 def tapDown3() {
-  sendEvent(tapDown3Response("digital"))
+  tapResponse("digital", 3, "Down").each { sendEvent(it) }
 }
 
 def tapUp4() {
-  sendEvent(tapUp4Response("digital"))
+  tapResponse("digital", 4, "Up").each { sendEvent(it) }
 }
 
 def tapDown4() {
-  sendEvent(tapDown4Response("digital"))
+  tapResponse("digital", 4, "Down").each { sendEvent(it) }
 }
 
 def tapUp5() {
-  sendEvent(tapUp5Response("digital"))
+  tapResponse("digital", 5, "Up").each { sendEvent(it) }
 }
 
 def tapDown5() {
-  sendEvent(tapDown5Response("digital"))
+  tapResponse("digital", 5, "Down").each { sendEvent(it) }
 }
 
 def holdUp() {
