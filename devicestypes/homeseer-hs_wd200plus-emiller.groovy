@@ -1,4 +1,4 @@
-ledBlinkPeriod/**
+/**
  *  HomeSeer HS-WD200+ Dimmer
  *
  *  Copyright 2019 Eric G. Miller
@@ -25,7 +25,7 @@ ledBlinkPeriod/**
  *  1.0       2019-06-07 Initial Hubitat Version
  *  1.0.1     2019-06-08 Fixes for some hubs not liking BigDecimals passed as configurationValue
  *  1.0.2     2019-06-09 Small fix so that when setting LED colors on a fan and a dimmer 0 can be used for all as well as 8
- *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
+   *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
  *
  *
  *	Previous Driver's Changelog:
@@ -521,22 +521,20 @@ def setStatusLed(String ledString, String colorName, String blinkChoice) {
   def cmds = []
   def ledsToUpdate = stringToLeds(ledString).findAll { leds().contains(it) }.sort()
   def color = color(colorName)
-  def blink = blinkChoice.equals("Yes") ? 1 : 0
 
   if (!state.statusLeds) {
-    state.statusLeds = Collections.nCopies(leds().size(), 0)
-    state.blinkval = (byte) 0
+    state.statusLeds = Collections.nCopies(leds().size(), [color: "Off", blink: "No"])
   }
+  ledsToUpdate.each {
+    state.statusLeds[it - 1] = [color: colorName, blink: blinkChoice]
+  }
+  logDebug "setStatusLed updated statusLeds $state.statusLeds"
 
   /*
    * Set led number and color
    */
-  ledsToUpdate.each {
-    state.statusLeds[it - 1] = color
-  }
-  logDebug "setStatusLed updated statusLeds $state.statusLeds"
 
-  if (state.statusLeds.find { it > 0 } == null) {
+  if (state.statusLeds.find { !it.color.equals("Off") } == null) {
     // no LEDS are set, put back to NORMAL mode
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: params().ledOperation,
         size: 1).format()
@@ -558,27 +556,24 @@ def setStatusLed(String ledString, String colorName, String blinkChoice) {
    */
 
   // Update blink mask
-  byte blinkval = state.blinkval ?: 0
-  ledsToUpdate.each {
-    def blinkbit = 0x1 << (it - 1)
-    blinkval = blink ? blinkval | blinkbit : blinkval & ~blinkbit
+  byte blinkMask = 0
+  leds().eachWithIndex { it, ledIndex ->
+    logTrace "blink ledIndex ${ledIndex}}"
+    if (state.statusLeds[ledIndex].blink.equals("Yes")) {
+        logTrace "setting blink bit ${0x1 << ledIndex}}"
+        blinkMask |= 0x1 << ledIndex
+    }
   }
-  state.blinkval = blinkval
-  logDebug "updated blink mask $state.blinkval"
+  logDebug "updated blink mask $blinkMask"
 
   // Change device blink parameter(s)
-  if (blink) {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
-        parameterNumber: params().ledBlinkMask, size: 1).format()
-    // set blink frequency if not already set, 5=500ms
-    if (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > 255) {
-      state.blinkDuration = 5
-      cmds << zwave.configurationV2.configurationSet(configurationValue: [5],
-        parameterNumber: params().ledBlinkPeriodOld, size: 1).format()
-    }
-  } else {
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
-        parameterNumber: params().ledBlinkMask, size: 1).format()
+  cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkMask],
+      parameterNumber: params().ledBlinkMask, size: 1).format()
+  // If at least one LED is blinking and blink frequency is not already set, set it to 5 (= a500ms)
+  if (blinkMask != 0 && (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > 255)) {
+    state.blinkDuration = 5
+    cmds << zwave.configurationV2.configurationSet(configurationValue: [5],
+      parameterNumber: params().ledBlinkPeriod, size: 1).format()
   }
 
   logTrace "cmds: $cmds"
@@ -858,7 +853,7 @@ def cleanup() {
   logDebug "cleanup()"
   unschedule()
   state.clear()
-  state.statusLeds = Collections.nCopies(leds().size(), 0)
+  state.statusLeds = Collections.nCopies(leds().size(), [color: "Off", blink: "No"])
 }
 
 private logInfo(msg) {
