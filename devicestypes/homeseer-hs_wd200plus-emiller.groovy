@@ -21,14 +21,33 @@
  *  Github: https://github.com/EricGregMiller/hubitat_codahq
  *  Source: Fork from https://github.com/codahq/hubitat_codahq.
  *
- *  Ben Rimmasch Changelog:
+ *  Changelog
+ *  ---------
+ *  2019-11-19 Emiller
+ *    * Fork from https://github.com/codahq/hubitat_codahq
+ *    * Move constants and special knowledge to front of code. Most notable: the button definitions and parameters are now coded as maps.
+ *    * Factorize tap response code. Thus replaced all the tapUp/DownNResponse methods with a single method with arguments.
+ *        Allowed removal of giant switch-case in zwaveEvent method.
+ *    * Remove all sendEvent calls from event handlers. Instead add such events to the return list of parse.
+ *        (1) This seems to be the proper use for the Hubitat/Smarthings design
+ *        (2) I don't know specifics for Hubitat, but in general it's a bad idea to have long delays in methods called from a server.
+ *        (3) Doing this fixed the double-tap to a level option. Without it that option did not work for me.
+ *    * Upgrade the single-tap up and the double-tap up and down options to set to any level. Add option for double-tap to move level up or down.
+ *    * Change LED status to list. Allows for cleaner code and less switch-case statements.
+ *    * Replace blink switch and hardcoded masks with formula based on switch index.
+ *    * Change LED status to be more readable. A single list holds colors and blink. Requires a little extra storage.
+ *
+ *
+ *  Ben Rimmasch Changelog
+ *  ----------------------
  *  1.0       2019-06-07 Initial Hubitat Version
  *  1.0.1     2019-06-08 Fixes for some hubs not liking BigDecimals passed as configurationValue
  *  1.0.2     2019-06-09 Small fix so that when setting LED colors on a fan and a dimmer 0 can be used for all as well as 8
-   *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
+ *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
  *
  *
- *	Previous Driver's Changelog:
+ *	Previous Driver's Changelog
+ *  ---------------------------
  *	1.0.dd.9  13-Feb-2019 Added dummy setLevel command with duration for compatibility with HA Bridge, others? (darwin@darwinsden.com)
  *	1.0.dd.8  28-Jul-2018 Additional protection against floating point default preference values
  *	1.0.dd.6  27-Jul-2018 Added call to set led flash rate and added protection against floating point default preference values
