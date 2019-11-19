@@ -110,8 +110,12 @@ private def buttons() {
 // Standard says max level is 100. But original code only allowed 99 and my testing indicates that 99 is highest.
 private def maxSwitchLevel() { 99 }
 
-// Status LED numbers.
-private def leds() { 1..7 }
+/**
+ * Number of status LED. LEDs are numbered from 1 to max where 1 is the low value, often called "bottom" and max
+ * the high value "top". There is a reverse setting for the swtich were low is the top and high is the bottom. The
+ * status LEDs also switch so 1 becomes the physical top and max the physical bottom.
+ */
+private def numLeds() { 7 }
 // Maximum LED blink value on switch
 private def maxBlinkPeriod() { 255 }
 // Conversion factor from switch blink value to ms (Each value is 100ms.)
@@ -197,7 +201,7 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "STRING", description: "Comma separated list of LED numbers, where ${leds()[0]} is bottom LED and ${leds()[-1]} is top. Use '..' to specify a range. Thus '1,2..5,7' sets LEDs 1,2,3,4,5, and 7. To set all use '1..7'"],
+      [name: "LED*", type: "STRING", description: "Comma separated list of LED numbers, where 1 is bottom LED and ${numLeds()} is top. Use '..' to specify a range. Thus '1,2..5,7' sets LEDs 1,2,3,4,5, and 7. To set all use '1..7'"],
       [name: "Color", type: "ENUM", constraints: colors(), description: "Select LED Color", default: "Off"],
       [name: "Blink", type: "ENUM", constraints: ["No", "Yes"], description: "Make LED blink?"]
     ]
@@ -519,11 +523,11 @@ def setStatusLed(String ledString, String colorName, String blinkChoice) {
   logDebug "setStatusLed($led, $colorName, $blinkChoice)"
   logDebug "setStatusLed statusLeds $state.statusLeds"
   def cmds = []
-  def ledsToUpdate = stringToLeds(ledString).findAll { leds().contains(it) }.sort()
+  def ledsToUpdate = stringToLeds(ledString).findAll { 1 <= it && it <= numLeds() }.sort()
   def color = color(colorName)
 
   if (!state.statusLeds) {
-    state.statusLeds = Collections.nCopies(leds().size(), [color: "Off", blink: "No"])
+    state.statusLeds = Collections.nCopies(numLeds(), [color: "Off", blink: "No"])
   }
   ledsToUpdate.each {
     state.statusLeds[it - 1] = [color: colorName, blink: blinkChoice]
@@ -557,21 +561,21 @@ def setStatusLed(String ledString, String colorName, String blinkChoice) {
 
   // Update blink mask
   byte blinkMask = 0
-  leds().eachWithIndex { it, ledIndex ->
-    logTrace "blink ledIndex ${ledIndex}}"
-    if (state.statusLeds[ledIndex].blink.equals("Yes")) {
-        logTrace "setting blink bit ${0x1 << ledIndex}}"
+  state.statusLeds.eachWithIndex { it, ledIndex ->
+    if (it.blink.equals("Yes")) {
         blinkMask |= 0x1 << ledIndex
     }
   }
-  logDebug "updated blink mask $blinkMask"
 
+  logDebug "Setting blink mask $blinkMask ..."
   // Change device blink parameter(s)
   cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkMask],
       parameterNumber: params().ledBlinkMask, size: 1).format()
   // If at least one LED is blinking and blink frequency is not already set, set it to 5 (= a500ms)
-  if (blinkMask != 0 && (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > 255)) {
-    state.blinkDuration = 5
+  if (blinkMask != 0 &&
+      (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > maxBlinkPeriod())) {
+    logDebug "Setting blink default blink period ..."
+    state.blinkDuration = defaultBlinkPeriod()
     cmds << zwave.configurationV2.configurationSet(configurationValue: [5],
       parameterNumber: params().ledBlinkPeriod, size: 1).format()
   }
@@ -853,7 +857,7 @@ def cleanup() {
   logDebug "cleanup()"
   unschedule()
   state.clear()
-  state.statusLeds = Collections.nCopies(leds().size(), [color: "Off", blink: "No"])
+  state.statusLeds = Collections.nCopies(numLeds(), [color: "Off", blink: "No"])
 }
 
 private logInfo(msg) {
