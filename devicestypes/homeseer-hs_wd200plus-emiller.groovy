@@ -107,6 +107,9 @@ private def buttons() {
   ]
 }
 
+// Standard says max level is 100. But original code only allowed 99 and my testing indicates that 99 is highest.
+private def maxSwitchLevel() { 99 }
+
 // Status LED numbers.
 private def leds() { 1..7 }
 // Maximum LED blink value on switch
@@ -228,11 +231,11 @@ metadata {
 
   preferences {
     input "singleTapToLevel", "bool", title: "Single-Tap Up sets to level", defaultValue: false, displayDuringSetup: true, required: false
-    input("singleTapLevel", "number", title: "Single-Tap Up Level (1-100)", range: "1..100", required: false)
+    input("singleTapLevel", "number", title: "Single-Tap Up Level (1-${maxSwitchLevel()})", range: "1..${maxSwitchLevel()}", required: false)
     input("doubleTapUpAction", "enum", title: "Action On Double-Tap Up", options: ["Set to level", "Increase by amount"], description: "Select Action", displayDuringSetup: true, required: false)
-    input("doubleTapUpLevel", "number", title: "Double-Tap Up Level or change (1-100)", range: "1..100", required: false)
+    input("doubleTapUpLevel", "number", title: "Double-Tap Up Level or change (1-${maxSwitchLevel()})", range: "1..${maxSwitchLevel()}", required: false)
     input("doubleTapDownAction", "enum", title: "Action On Double-Tap Down", options: ["Set to level", "Decrease by amount"], description: "Select Action", displayDuringSetup: true, required: false)
-    input("doubleTapDownLevel", "number", title: "Double-Tap Down Level or change (1-100)", range: "1..100", required: false)
+    input("doubleTapDownLevel", "number", title: "Double-Tap Down Level or change (1-${maxSwitchLevel()})", range: "1..${maxSwitchLevel()}", required: false)
     input "reverseSwitch", "bool", title: "Reverse Switch", defaultValue: false, displayDuringSetup: true, required: false
     input "bottomled", "bool", title: "Bottom LED On if Load is Off", defaultValue: false, displayDuringSetup: true, required: false
     input("localcontrolramprate", "number", title: "Press Configuration button after changing preferences\n\nLocal Ramp Rate: Duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
@@ -291,7 +294,7 @@ private dimmerEvents(hubitat.zwave.Command cmd) {
   def result = [createEvent(name: "switch", value: value)]
   logInfo "Switch for ${device.label} is ${value}"
   if (cmd.value != null) {
-    state.lastLevel = cmd.value < 0 ? 0 : cmd.value > 100 ? 100 : cmd.value
+    state.lastLevel = cmd.value < 0 ? 0 : cmd.value > maxSwitchLevel() ? maxSwitchLevel() : cmd.value
     result << createEvent(name: "level", value: cmd.value, unit: "%")
     logInfo "Level for ${device.label} is ${cmd.value}"
   }
@@ -411,7 +414,7 @@ def off() {
 private def setLevelComputeLevel(value) {
   logDebug "setLevelComputeLevel($value)"
   def valueaux = value as Integer
-  def level = valueaux < 0 ? 0 : valueaux > 100 ? 100 : valueaux
+  def level = valueaux < 0 ? 0 : valueaux > maxSwitchLevel() ? maxSwitchLevel() : valueaux
   logDebug "computed Level: $level"
   return level
 }
