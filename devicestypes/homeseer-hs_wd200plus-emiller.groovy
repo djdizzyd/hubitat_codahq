@@ -1,4 +1,4 @@
-/**
+ledBlinkPeriod/**
  *  HomeSeer HS-WD200+ Dimmer
  *
  *  Copyright 2019 Eric G. Miller
@@ -131,8 +131,8 @@ private def params() {
       ledOperation:          13, // 0: Normal, 1: Custom
       ledNormalColor:        14, // Sets normal color of LED. See colors.
       ledStatusColor:        21, // Set status color for LED. See colors.
-      ledBlinkPeriodOld:     30, // LED period?? Existing code sometimes uses 30, sometimes 31. Not sure why. 31 is current value in Homeseer user guide.
-      ledBlinkPeriod:        31  // LED period period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
+      ledBlinkPeriod:        30, // LED blink period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
+      ledBlinkMask:          31  // LED blink mask. A byte that defines which LEDs blink. (0x01 = LED 1, 0X02 = LED 2, etc)
     ]
 }
 
@@ -476,9 +476,9 @@ def setBlinkDurationMS(newBlinkDuration) {
   if (0 < newBlinkDuration && newBlinkDuration < maxBlinkPeriodMs()) {
     logDebug "setting blink duration to: ${newBlinkDuration} ms"
     state.blinkDuration = newBlinkDuration.toInteger() / blinkMsPerValue()
-    logDebug "blink duration config (parameter ${params().ledBlinkPeriodOld}) is: ${state.blinkDuration}"
+    logDebug "blink duration config (parameter ${params().ledBlinkPeriod}) is: ${state.blinkDuration}"
     cmds << zwave.configurationV2.configurationSet(configurationValue: [state.blinkDuration.toInteger()],
-      parameterNumber: params().ledBlinkPeriodOld, size: 1).format()
+      parameterNumber: params().ledBlinkPeriod, size: 1).format()
   } else {
     log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. ${maxBlinkPeriodMs()} ms"
   }
@@ -551,7 +551,7 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
   // Change device blink parameter(s)
   if (blink) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
-        parameterNumber: params().ledBlinkPeriod, size: 1).format()
+        parameterNumber: params().ledBlinkMask, size: 1).format()
     // set blink frequency if not already set, 5=500ms
     if (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > 255) {
       state.blinkDuration = 5
@@ -560,7 +560,7 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
     }
   } else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
-        parameterNumber: params().ledBlinkPeriod, size: 1).format()
+        parameterNumber: params().ledBlinkMask, size: 1).format()
   }
 
   logTrace "cmds: $cmds"
