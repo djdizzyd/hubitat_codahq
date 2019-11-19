@@ -194,7 +194,7 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "NUMBER", range: 0..8, description: leds().collect{"${it}=LED ${it}${it==1?" (bottom)":""}"}.sort().join(", ") + ", 0 or 8=ALL"],
+      [name: "LED*", type: "STRING", description: "Comma separated list of LED numbers, where ${leds()[0]} is bottom LED and ${leds()[-1]} is top. Use '..' to specify a range. Thus '1,2..5,7' sets LEDs 1,2,3,4,5, and 7. To set all use '1..7'"],
       [name: "Color", type: "ENUM", constraints: colors(), description: "Select LED Color", default: "Off"],
       [name: "Blink", type: "ENUM", constraints: ["No", "Yes"], description: "Make LED blink?"]
     ]
@@ -485,10 +485,38 @@ def setBlinkDurationMS(newBlinkDuration) {
   return cmds
 }
 
-def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
+/**
+ * Convert comma separated string of integers to a list. Use '..' to specify a range.
+ * Thus '1,3..6' produces [1,3,4,5,6]. '1..3,4,7' produces [1,2,3,4,7].
+ * A warning is logged for invalid values and they are ignored.
+ */
+private def stringToLeds(String string) {
+  if (!string) {
+    return
+  }
+  def values = string.split(",")
+  result = []
+  values.each {
+    def endpoints = it.split("\\.\\.")
+    logTrace "endpoints $endpoints"
+    def startValue = endpoints[0]
+    def endValue = endpoints.size() > 1 ? endpoints[1] : startValue
+    if (!startValue.isInteger() || !endValue.isInteger()) {
+      log.warn "Ignoring invalid string $it. It does not define integers."
+    } else {
+      for (int ii = startValue.toInteger(); ii <= endValue.toInteger(); ii++) {
+        result << ii
+      }
+    }
+  }
+  return result
+}
+
+def setStatusLed(String ledString, String colorName, String blinkChoice) {
   logDebug "setStatusLed($led, $colorName, $blinkChoice)"
   logDebug "setStatusLed statusLeds $state.statusLeds"
   def cmds = []
+  def ledsToUpdate = stringToLeds(ledString).findAll { leds().contains(it) }.sort()
   def color = color(colorName)
   def blink = blinkChoice.equals("Yes") ? 1 : 0
 
@@ -500,11 +528,8 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
   /*
    * Set led number and color
    */
-  if (0 == led || 8 == led) {
-    // Special case - all LED's
-    state.statusLeds = Collections.nCopies(leds().size(), color)
-  } else {
-    state.statusLeds[led.toInteger() - 1] = color
+  ledsToUpdate.each {
+    state.statusLeds[it - 1] = color
   }
   logDebug "setStatusLed updated statusLeds $state.statusLeds"
 
@@ -519,17 +544,10 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
         size: 1).format()
   }
 
-  if (led == 8 | led == 0) {
-    leds().each {
-      // set color for all LEDs
+  ledsToUpdate.each {
+      // set color for LEDs
       cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()],
           parameterNumber: params().ledStatusColors[it-1], size: 1).format()
-    }
-  }
-  else {
-    // set color for specified LED
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()],
-        parameterNumber: params().ledStatusColors[led.intValue()], size: 1).format()
   }
 
   /*
@@ -538,10 +556,8 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
 
   // Update blink mask
   byte blinkval = state.blinkval ?: 0
-  if (0 == led || 8 == led) {
-    blinkval = blink ? 0x7F : 0x00
-  } else {
-    def blinkbit = 0x1 << (led.toInteger() - 1)
+  ledsToUpdate.each {
+    def blinkbit = 0x1 << (it - 1)
     blinkval = blink ? blinkval | blinkbit : blinkval & ~blinkbit
   }
   state.blinkval = blinkval
