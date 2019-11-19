@@ -115,6 +115,8 @@ private def maxBlinkPeriod() { 255 }
 private def blinkMsPerValue() { 100 }
 // Maximum LED blink value in ms (used for user interface)
 private def maxBlinkPeriodMs() { maxBlinkPeriod() * blinkMsPerValue() }
+// Default blink period. Used when blink is requested and no period is set. (5 = 500ms)
+private def defaultBlinkPeriod() { 5 }
 
 /**
  * Parameters used by switch to control switch behavior LEDs
@@ -492,10 +494,12 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
 
   if (!state.statusLeds) {
     state.statusLeds = Collections.nCopies(leds().size(), 0)
-    state.blinkval = 0
+    state.blinkval = (byte) 0
   }
 
-  /* set led # and color */
+  /*
+   * Set led number and color
+   */
   if (0 == led || 8 == led) {
     // Special case - all LED's
     state.statusLeds = Collections.nCopies(leds().size(), color)
@@ -529,79 +533,36 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
         parameterNumber: led.intValue() + ledParamBase, size: 1).format()
   }
 
-  // check if LED should be blinking
-  def blinkval = state.blinkval == null ? 0 : state.blinkval
+  /*
+   * Set blink
+   */
 
+  // Update blink mask
+  byte blinkval = state.blinkval ?: 0
+  if (0 == led || 8 == led) {
+    blinkval = blink ? 0x7F : 0x00
+  } else {
+    def blinkbit = 0x1 << (led.toInteger() - 1)
+    blinkval = blink ? blinkval | blinkbit : blinkval & ~blinkbit
+  }
+  state.blinkval = blinkval
+  logDebug "updated blink mask $state.blinkval"
+
+  // Change device blink parameter(s)
   if (blink) {
-    switch (led) {
-      case 1:
-        blinkval = blinkval | 0x1
-        break
-      case 2:
-        blinkval = blinkval | 0x2
-        break
-      case 3:
-        blinkval = blinkval | 0x4
-        break
-      case 4:
-        blinkval = blinkval | 0x8
-        break
-      case 5:
-        blinkval = blinkval | 0x10
-        break
-      case 6:
-        blinkval = blinkval | 0x20
-        break
-      case 7:
-        blinkval = blinkval | 0x40
-        break
-      case 0:
-      case 8:
-        blinkval = 0x7F
-        break
-    }
     cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
         parameterNumber: params().ledBlinkPeriod, size: 1).format()
-    state.blinkval = blinkval
     // set blink frequency if not already set, 5=500ms
     if (state.blinkDuration == null | state.blinkDuration < 0 | state.blinkDuration > 255) {
+      state.blinkDuration = 5
       cmds << zwave.configurationV2.configurationSet(configurationValue: [5],
         parameterNumber: params().ledBlinkPeriodOld, size: 1).format()
     }
-  }
-  else {
-
-    switch (led) {
-      case 1:
-        blinkval = blinkval & 0xFE
-        break
-      case 2:
-        blinkval = blinkval & 0xFD
-        break
-      case 3:
-        blinkval = blinkval & 0xFB
-        break
-      case 4:
-        blinkval = blinkval & 0xF7
-        break
-      case 5:
-        blinkval = blinkval & 0xEF
-        break
-      case 6:
-        blinkval = blinkval & 0xDF
-        break
-      case 7:
-        blinkval = blinkval & 0xBF
-        break
-      case 0:
-      case 8:
-        blinkval = 0
-        break
-    }
+  } else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [blinkval],
         parameterNumber: params().ledBlinkPeriod, size: 1).format()
-    state.blinkval = blinkval
   }
+
   logTrace "cmds: $cmds"
   delayBetween(cmds, 150)
 }
