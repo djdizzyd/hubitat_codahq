@@ -126,11 +126,11 @@ private def params() {
       ledOff:                 3, // 0: LED on when switch off, 1: LED off when off
       loadOrientation:        4, // 0: Top of paddle is on, 1: Bottom of paddle is on
       configVerify:       7..10, // From code
-      remoteControlRampRate: 11, // From existing code. Not in current doc.
-      localControlRampRate:  12, // From existing code. Not in current doc.
-      ledOperation:          13, // 0: Normal, 1: Custom
+      remoteControlRampRate: 11, // Set dimmer Ramp rate for remote control. Range 0 - 90 seconds. From existing code and older doc. Not in current doc.
+      localControlRampRate:  12, // Set dimmer Ramp rate for local control. Range 0 - 90 seconds. From existing code and older doc. Not in current doc.
+      ledOperation:          13, // 0: Normal Mode (show switch level), 1: Custom or Status Mode (customize LEDs)
       ledNormalColor:        14, // Sets normal color of LED. See colors.
-      ledStatusColor:        21, // Set status color for LED. See colors.
+      ledStatusColors:   21..27, // Set status color for each LED. See colors.
       ledBlinkPeriod:        30, // LED blink period (1/frequency) in tenths of seconds (e.g. 1 = 100ms, 2 = 200ms, ... 255 = 25500ms)
       ledBlinkMask:          31  // LED blink mask. A byte that defines which LEDs blink. (0x01 = LED 1, 0X02 = LED 2, etc)
     ]
@@ -519,18 +519,17 @@ def setStatusLed(BigDecimal led, String colorName, String blinkChoice) {
         size: 1).format()
   }
 
-  def ledParamBase = params().ledStatusColor - 1
   if (led == 8 | led == 0) {
     leds().each {
       // set color for all LEDs
       cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()],
-          parameterNumber: it + ledParamBase, size: 1).format()
+          parameterNumber: params().ledStatusColors[it-1], size: 1).format()
     }
   }
   else {
     // set color for specified LED
     cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()],
-        parameterNumber: led.intValue() + ledParamBase, size: 1).format()
+        parameterNumber: params().ledStatusColors[led.intValue()], size: 1).format()
   }
 
   /*
