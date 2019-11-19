@@ -220,7 +220,7 @@ metadata {
     command "holdUp"
     command "holdDown"
     command "setStatusLed", [
-      [name: "LED*", type: "STRING", description: "Comma separated list of LED numbers, where 1 is bottom LED and ${numLeds()} is top. Use '..' to specify a range. Thus '1,2..5,7' sets LEDs 1,2,3,4,5, and 7. To set all use '1..7'"],
+      [name: "LED*", type: "STRING", description: "Comma separated list of LED numbers, where 1 is bottom LED and ${numLeds()} is top. Use '..' to specify a range. Thus '1,2..5,7' sets LEDs 1,2,3,4,5, and 7. To set all use '1..' or '..7'"],
       [name: "Color", type: "ENUM", constraints: colors(), description: "Select LED Color", default: "Off"],
       [name: "Blink", type: "ENUM", constraints: ["No", "Yes"], description: "Make LED blink?"]
     ]
@@ -514,20 +514,48 @@ def setBlinkDurationMS(newBlinkDuration) {
 /**
  * Convert comma separated string of integers to a list. Use '..' to specify a range.
  * Thus '1,3..6' produces [1,3,4,5,6]. '1..3,4,7' produces [1,2,3,4,7].
+ * Defining one end of range assume going to end. Thus '..3' produces [1,2,3] and '4..' produces [4,5, ... ,max]
  * A warning is logged for invalid values and they are ignored.
  */
-private def stringToLeds(String string) {
+private def stringToInts(String string, int max) {
+  logDebug "stringToInts string $string, max $max"
   if (!string) {
     return
   }
-  def values = string.split(",")
+  def commaSplit = ~/ *, */
+  def rangeSplit = ~/ *\.\.+ */
+  def values = commaSplit.split(string)
+  logDebug "values $values"
   result = []
   values.each {
-    def endpoints = it.split("\\.\\.")
-    logTrace "endpoints $endpoints"
-    def startValue = endpoints[0]
-    def endValue = endpoints.size() > 1 ? endpoints[1] : startValue
-    if (!startValue.isInteger() || !endValue.isInteger()) {
+    logTrace "processing value $it"
+    def startValue = null
+    def endValue = null
+    def matcher = it =~ rangeSplit
+    if (matcher.find()) {
+      def endpoints = rangeSplit.split(it).findAll { it != null && it != "" && it.isInteger() }
+          .collect { it.toInteger() }
+      logTrace "endpoints $endpoints"
+      if (endpoints.size() == 0) {
+      } else if (endpoints.size() == 1) {
+        // With only one endpoint assume N.. or ..N implying sequence from or to end.
+        if (matcher.start() == 0) {
+          startValue = 1
+          endValue = endpoints[0]
+        } else {
+          startValue = endpoints[0]
+          endValue = max
+        }
+      } else {
+        startValue = endpoints[0]
+        endValue = endpoints[1]
+      }
+    } else {
+      startValue = it.isInteger() ? it.toInteger() : null
+      endValue = startValue
+    }
+    logTrace "startValue $startValue, endValue $endValue"
+    if (startValue == null || endValue == null) {
       log.warn "Ignoring invalid string $it. It does not define integers."
     } else {
       for (int ii = startValue.toInteger(); ii <= endValue.toInteger(); ii++) {
@@ -535,14 +563,18 @@ private def stringToLeds(String string) {
       }
     }
   }
-  return result
+  return result.findAll { 1 <= it && it <= max }.sort()
 }
 
 def setStatusLed(String ledString, String colorName, String blinkChoice) {
-  logDebug "setStatusLed($led, $colorName, $blinkChoice)"
+  logDebug "setStatusLed($ledString, $colorName, $blinkChoice)"
   logDebug "setStatusLed statusLeds $state.statusLeds"
   def cmds = []
-  def ledsToUpdate = stringToLeds(ledString).findAll { 1 <= it && it <= numLeds() }.sort()
+  def ledsToUpdate = stringToInts(ledString, numLeds())
+  if (!ledsToUpdate) {
+    return
+  }
+  logDebug "ledsToUpdate $ledsToUpdate"
   def color = color(colorName)
 
   if (!state.statusLeds) {
