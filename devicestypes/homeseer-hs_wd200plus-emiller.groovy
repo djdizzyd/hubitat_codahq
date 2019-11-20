@@ -81,14 +81,14 @@
 /**
  * Scene values returned with switch events
  */
-private def scenes() {
+private static Map scenes() {
    return [up: 1, down: 2]
 }
 
 /**
  * Key attribute values returned with switch events
  */
-private def ka() {
+private static Map ka() {
    [
      tap1: 0,
      unknown: 1,
@@ -103,14 +103,14 @@ private def ka() {
 /**
  * Special value for hold "number of taps"
  */
-private def hold() { -1 }
+private static int hold() { -1 }
 
 /**
  * Association of buttons numbers with direction, taps, scene, and key attribute
  * It should be possible to change button number simply by editing this map.
  */
-private def buttons() {
-  return [
+private static List<Map> buttons() {
+  [
     [buttonNum: 1, direction: "Up",    numTaps: 2,      scene: scenes().up,   keyAttribute: ka().tap2],
     [buttonNum: 2, direction: "Down",  numTaps: 2,      scene: scenes().down, keyAttribute: ka().tap2],
     [buttonNum: 3, direction: "Up",    numTaps: 3,      scene: scenes().up,   keyAttribute: ka().tap3],
@@ -127,27 +127,27 @@ private def buttons() {
 }
 
 // Standard says max level is 100. But original code only allowed 99 and my testing indicates that 99 is highest.
-private def maxSwitchLevel() { 99 }
+private static int maxSwitchLevel() { 99 }
 
 /**
  * Number of status LED. LEDs are numbered from 1 to max where 1 is the low value, often called "bottom" and max
  * the high value "top". There is a reverse setting for the swtich were low is the top and high is the bottom. The
  * status LEDs also switch so 1 becomes the physical top and max the physical bottom.
  */
-private def numLeds() { 7 }
+private static int numLeds() { 7 }
 // Maximum LED blink value on switch
-private def maxBlinkPeriod() { 255 }
+private static int maxBlinkPeriod() { 255 }
 // Conversion factor from switch blink value to ms (Each value is 100ms.)
-private def blinkMsPerValue() { 100 }
+private static int blinkMsPerValue() { 100 }
 // Maximum LED blink value in ms (used for user interface)
-private def maxBlinkPeriodMs() { maxBlinkPeriod() * blinkMsPerValue() }
+private static int maxBlinkPeriodMs() { maxBlinkPeriod() * blinkMsPerValue() }
 // Default blink period. Used when blink is requested and no period is set. (5 = 500ms)
-private def defaultBlinkPeriod() { 5 }
+private static int defaultBlinkPeriod() { 5 }
 
 /**
  * Parameters used by switch to control switch behavior LEDs
  */
-private def params() {
+private static Map params() {
     [
       ledOff:                 3, // 0: LED on when switch off, 1: LED off when off
       loadOrientation:        4, // 0: Top of paddle is on, 1: Bottom of paddle is on
@@ -165,31 +165,31 @@ private def params() {
 /**
  * LED status colors
  */
-private def colors() {
+private static List<String> colors() {
   ["Off", "Red", "Green", "Blue", "Magenta", "Yellow", "Cyan", "White"]
 }
 
 /**
  * Color number of a status color name
  */
-private def color(colorName) {
+private static int color(colorName) {
   colors().indexOf(colorName)
 }
 
 /**
  * LED normal mode colors. Slightly different than status because no off and white is zero.
  */
-private def normalColors() {
-  def ncolors = []
-  ncolors << colors()[-1]
-  (1..colors().size() - 2).each {ii -> ncolors << colors()[ii]}
-  return ncolors
+private static List normalColors() {
+  List normalColors = []
+  normalColors << colors()[-1]
+  (1..colors().size() - 2).each {ii -> normalColors << colors()[ii]}
+  return normalColors
 }
 
 /**
  * Color number of a normal color name
  */
-private def normalColor(colorName) {
+private static int normalColor(colorName) {
   normalColors().indexOf(colorName)
 }
 
@@ -274,8 +274,8 @@ metadata {
 /**
  * Method which handles all messages from switch
 */
-def parse(String description) {
-  def result = null
+List parse(String description) {
+  def result = []
   def cmd = null
   logDebug("parse($description)")
   if (description != "updated") {
@@ -294,27 +294,27 @@ def parse(String description) {
   return result
 }
 
-def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
+List zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
   dimmerEvents(cmd)
 }
 
-def zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
+List zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
   dimmerEvents(cmd)
 }
 
-def zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelReport cmd) {
+List zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelReport cmd) {
   dimmerEvents(cmd)
 }
 
-def zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelSet cmd) {
+List zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelSet cmd) {
   dimmerEvents(cmd)
 }
 
-private dimmerEvents(hubitat.zwave.Command cmd) {
+private List dimmerEvents(hubitat.zwave.Command cmd) {
   logDebug "dimmerEvents(hubitat.zwave.Command cmd)"
   logTrace "cmd: $cmd"
-  def value = (cmd.value ? "on" : "off")
-  def result = [createEvent(name: "switch", value: value)]
+  String value = (cmd.value ? "on" : "off")
+  List result = [createEvent(name: "switch", value: value)]
   logInfo "Switch for ${device.label} is ${value}"
   if (cmd.value != null) {
     state.lastLevel = cmd.value < 0 ? 0 : cmd.value > maxSwitchLevel() ? maxSwitchLevel() : cmd.value
@@ -327,7 +327,7 @@ private dimmerEvents(hubitat.zwave.Command cmd) {
 def zwaveEvent(hubitat.zwave.commands.configurationv1.ConfigurationReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.configurationv1.ConfigurationReport cmd)"
   logTrace "cmd: $cmd"
-  def value = "when off"
+  String value = "when off"
   if (cmd.configurationValue[0] == 1) { value = "when on" }
   if (cmd.configurationValue[0] == 2) { value = "never" }
   logInfo "Indicator is on for fan: ${value}"
@@ -524,7 +524,7 @@ private List stringToInts(String intString, int max) {
   }
   def commaSplit = ~/ *, */
   def rangeSplit = ~/ *\.\.+ */
-  def values = commaSplit.split(intString)
+  List values = commaSplit.split(intString)
   logDebug "values $values"
   result = []
   values.each {
@@ -919,26 +919,38 @@ def updated() {
   delayBetween(cmds, 500)
 }
 
-def installed() {
+void installed() {
   logDebug "installed()"
   cleanup()
 }
 
-def cleanup() {
+void cleanup() {
   logDebug "cleanup()"
   unschedule()
   state.clear()
   state.statusLeds = Collections.nCopies(numLeds(), [color: "Off", blink: "No"])
 }
 
-private logInfo(msg) {
+void logInfo(GString msg) {
+  logInfo msg.toString()
+}
+
+void logInfo(String msg) {
   if (descriptionTextEnable) log.info msg
 }
 
-def logDebug(msg) {
+void logDebug(GString msg) {
+  logDebug msg.toString()
+}
+
+void logDebug(String msg) {
   if (logEnable) log.debug msg
 }
 
-def logTrace(msg) {
+void logTrace(GString msg) {
+  logTrace msg.toString()
+}
+
+void logTrace(String msg) {
   if (traceLogEnable) log.trace msg
 }
