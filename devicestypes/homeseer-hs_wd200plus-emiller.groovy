@@ -463,7 +463,7 @@ def setLevel(value) {
 private def setLevelNoSend(value) {
   def level = setLevelComputeLevel(value)
   def result = setLevelEventMaps(level).collect { createEvent(it) }
-  result << response(setLevelDeviceCommands(level, true))
+  result.addAll(response(setLevelDeviceCommands(level, true)))
   return result
 }
 
@@ -517,53 +517,73 @@ def setBlinkDurationMS(newBlinkDuration) {
  * Defining one end of range assume going to end. Thus '..3' produces [1,2,3] and '4..' produces [4,5, ... ,max]
  * A warning is logged for invalid values and they are ignored.
  */
-private def stringToInts(String string, int max) {
-  logDebug "stringToInts string $string, max $max"
-  if (!string) {
+private List stringToInts(String intString, int max) {
+  logDebug "stringToInts string $intString, max $max"
+  if (!intString) {
     return
   }
   def commaSplit = ~/ *, */
   def rangeSplit = ~/ *\.\.+ */
-  def values = commaSplit.split(string)
+  def values = commaSplit.split(intString)
   logDebug "values $values"
   result = []
   values.each {
     logTrace "processing value $it"
-    def startValue = null
-    def endValue = null
-    def matcher = it =~ rangeSplit
-    if (matcher.find()) {
-      def endpoints = rangeSplit.split(it).findAll { it != null && it != "" && it.isInteger() }
-          .collect { it.toInteger() }
-      logTrace "endpoints $endpoints"
-      if (endpoints.size() == 0) {
-      } else if (endpoints.size() == 1) {
-        // With only one endpoint assume N.. or ..N implying sequence from or to end.
-        if (matcher.start() == 0) {
-          startValue = 1
-          endValue = endpoints[0]
-        } else {
-          startValue = endpoints[0]
-          endValue = max
-        }
+    result.addAll(stringRangeToInts(it, max, rangeSplit))
+  }
+  return result.sort()
+}
+
+/**
+ * Convert a string which defines an integer range to a list of integers. A range is indicated by two dots '..'.
+ * Thus '3..6' returns [3,4,5,6]. If the beginning value is missing the first bound is one (1). Thus '..4' returns [1,2,3,4]
+ * Likewise when the final value is missing it is assumed to be 'max'. Thus '3..' returns [3,4, ... ,max]
+ * A single integer without a range indicator return a list with a single value. Thus '5' returns [5]
+ * Returned integers are between one (1) and input 'max'. Values less than one or greater than 'max' are not returned.
+ *
+ * @param rangeString String containing input range.
+ * @param max Maximum value allowed.
+ * @param rangeSplit A regex pattern which defines the range splitter. It is input to avoid the overhead of compiling
+ *        the regex many times.
+ */
+private List stringRangeToInts(String rangeString, int max, rangeSplit) {
+  logTrace "processing value $rangeString"
+  List result = []
+  Integer startValue = null
+  Integer endValue = null
+  def matcher = rangeString =~ rangeSplit
+  if (matcher.find()) {
+    def endpoints = rangeSplit.split(rangeString)
+        .findAll { it != null && it != "" && it.isInteger() }
+        .collect { it.toInteger() }
+    logTrace "endpoints $endpoints"
+    if (endpoints.size() == 0) {
+    } else if (endpoints.size() == 1) {
+      // With only one endpoint assume N.. or ..N implying sequence from or to end.
+      if (matcher.start() == 0) {
+        startValue = 1
+        endValue = endpoints[0]
       } else {
         startValue = endpoints[0]
-        endValue = endpoints[1]
+        endValue = max
       }
     } else {
-      startValue = it.isInteger() ? it.toInteger() : null
-      endValue = startValue
+      startValue = endpoints[0]
+      endValue = endpoints[1]
     }
-    logTrace "startValue $startValue, endValue $endValue"
-    if (startValue == null || endValue == null) {
-      log.warn "Ignoring invalid string $it. It does not define integers."
-    } else {
-      for (int ii = startValue.toInteger(); ii <= endValue.toInteger(); ii++) {
-        result << ii
-      }
+  } else {
+    startValue = rangeString.isInteger() ? rangeString.toInteger() : null
+    endValue = startValue
+  }
+  logTrace "startValue $startValue, endValue $endValue"
+  if (startValue == null || endValue == null) {
+    log.warn "Ignoring invalid string $rangeString. It does not define integers."
+  } else {
+    for (int ii = startValue.toInteger(); ii <= endValue.toInteger(); ii++) {
+      result << ii
     }
   }
-  return result.findAll { 1 <= it && it <= max }.sort()
+  return result.findAll { 1 <= it && it <= max }
 }
 
 def setStatusLed(String ledString, String colorName, String blinkChoice) {
@@ -574,7 +594,7 @@ def setStatusLed(String ledString, String colorName, String blinkChoice) {
   if (!ledsToUpdate) {
     return
   }
-  logDebug "ledsToUpdate $ledsToUpdate"
+  logDebug "ledsToUpdate $ledsToUpdate, size = ${ledsToUpdate.size()}"
   def color = color(colorName)
 
   if (!state.statusLeds) {
