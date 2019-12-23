@@ -238,11 +238,15 @@ def configure(){
   ]
 }
 
-def installed() {
+def updated() {
   state.counter = state.counter ? state.counter + 1 : 1
   if (state.counter == 1) {
     addChildWhiteChannel()
   }
+}
+
+def installed() {
+  updated()
 }
 
 def addChildWhiteChannel() {
