@@ -1,13 +1,18 @@
 /**
  *  Monoprice Z-Wave Plus Shock Detector PID 15269 v0.1
- *  Ben Rimmasch
  *
  *  Made from pieces of the ST Vision Shock Sensor by krlaframboise
  *
  *  If the Monoprice guys sent you to use this sensor shame on them.
  *
- *    0.1 (03/13/2019)
- *      -  Initial Release
+ *	Author: Ben Rimmasch
+ *	Date: 2019-03-13
+ *
+ *  Changelog:
+ *  1.0.0     2019-03-13 Initial Release
+ *  1.0.1     2020-01-16 Fixed battery level to be consistent with OOB drivers to have "%" unit
+ *                       Added version report (lid must be open to send and receive and LED will stay on)
+ *                       Added manufacturer specific report (list must be open to send and receive and LED will stay on)
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
  *  in compliance with the License. You may obtain a copy of the License at:
@@ -90,8 +95,10 @@ def configure() {
   }
 
   cmds << wakeUpIntervalSetCmd(checkinIntervalSettingMinutes)
+  cmds << secureCmd(zwave.versionV1.versionGet())
+  cmds << secureCmd(zwave.manufacturerSpecificV1.manufacturerSpecificGet())
 
-  return cmds
+  return delayBetween(cmds, 500)
 }
 
 // Required for HealthCheck Capability, but doesn't actually do anything because this device sleeps.
@@ -191,7 +198,7 @@ def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
   }
   state.lastBatteryReport = new Date().time
   logInfo "Battery: ${val}%"
-  return createEvent([name: "battery", value: val, descriptionText: "battery ${val}%"])
+  return createEvent([name: "battery", value: val, descriptionText: "battery ${val}%", unit: "%"])
 }
 
 def zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
@@ -212,6 +219,44 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalReport cmd) {
     log.warn "wtf ${cmd}"
   }
   return []
+}
+
+def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
+  logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd)"
+  logTrace "cmd: $cmd"
+  logDebug("received Version Report")
+  logDebug "applicationVersion:      ${cmd.applicationVersion}"
+  logDebug "applicationSubVersion:   ${cmd.applicationSubVersion}"
+  logDebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
+  logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
+  logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
+  def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
+  def cmds = []
+  if (!(ver.equals(getDataValue("firmware")))) {
+    updateDataValue("firmware", ver)
+    cmds << createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
+  }
+  cmds
+}
+
+def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
+  logDebug "zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd)"
+  logTrace "cmd: $cmd"
+  logDebug "manufacturerId:   ${cmd.manufacturerId}"
+  logDebug "manufacturerName: ${cmd.manufacturerName}"
+  logDebug "productId:        ${cmd.productId}"
+  logDebug "productTypeId:    ${cmd.productTypeId}"
+  def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
+  def cmds = []
+  if (!(msr.equals(getDataValue("MSR")))) {
+    updateDataValue("MSR", msr)
+    cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
+  }
+  if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
+    updateDataValue("manufacturer", cmd.manufacturerName)
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+  }
+  cmds
 }
 
 // Logs unexpected events from the device.
@@ -245,7 +290,7 @@ def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
       logIncompatible(cmd)
     }
   }
-  //We'll throw these out for now and handle it in BasicSet for now
+  //We'll throw these out and handle it in BasicSet for now
   else if (cmd.notificationType == 7 && cmd.v1AlarmType == 2) {
     if (cmd.eventParametersLength == 1 && cmd.eventParameter[0] == 2) {
       //def val = cmd.v1AlarmLevel == 0xFF ? "active" : "inactive" 
