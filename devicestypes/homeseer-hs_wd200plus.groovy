@@ -23,6 +23,12 @@
  *  1.0.1     2019-06-08 Fixes for some hubs not liking BigDecimals passed as configurationValue
  *  1.0.2     2019-06-09 Small fix so that when setting LED colors on a fan and a dimmer 0 can be used for all as well as 8
  *  1.0.3     2019-09-12 Fixed the delay between level gets in setLevel
+ *  1.0.4     2020-01-16 Fixed the delay between for single and double tap events
+ *                       Added preference to not let setStatusLed to manage switch mode.  If not used carefully this can conflict with bottom status 
+ *                         on when load off or the setStatusLed command.  However, it lets a user hide load when no status LEDs are set
+ *                       Fixed firmware reporting for new Hubitat command classes
+ *                       Made manufacturer an int and added manufacturer name
+ *                       Fixed fingerprint hopefully
  *
  *
  *	Previous Driver's Changelog:
@@ -89,8 +95,8 @@ metadata {
     command "setDefaultColor", [[name: "Set Normal Mode LED Color", type: "NUMBER", range: 0..6, description: "0=White, 1=Red, 2=Green, 3=Blue, 4=Magenta, 5=Yellow, 6=Cyan"]]
     command "setBlinkDurationMS", [[name: "Set Blink Duration", type: "NUMBER", description: "Milliseconds (0 to 25500)"]]
 
-    fingerprint mfr: "000C", prod: "4447", model: "3036"
-    //to add new fingerprints convert dec manufacturer to hex mfr, dec deviceType to hex prod, and dec deviceId to hex model
+    fingerprint mfr: "000C", prod: "4447", deviceId: "3036"
+    //to add new fingerprints convert dec manufacturer to hex mfr, dec deviceType to hex prod, and dec deviceId to hex deviceId
   }
 
   simulator {
@@ -112,6 +118,10 @@ metadata {
   }
 
   preferences {
+    input "preventSetStatusLedManageLedMode", "bool", title: "<b>Prevent the setStatusLed Command From Managing Switch Mode</b>", 
+      description: "Turning this on will allow a user to hide load LEDs when the switch has no status LEDs set.  Keep in mind turning " +
+      "this on also means that setStatusLed could fail if the switch mode is normal when status LED colors are set. Additionally, the " +
+      "bottom LED may not show on when the load is off.", defaultValue: false, displayDuringSetup: true, required: false
     input "doubleTapToFullBright", "bool", title: "Double-Tap Up sets to full brightness", defaultValue: false, displayDuringSetup: true, required: false
     input "singleTapToFullBright", "bool", title: "Single-Tap Up sets to full brightness", defaultValue: false, displayDuringSetup: true, required: false
     input "doubleTapDownToDim", "bool", title: "Double-Tap Down sets to 25% level", defaultValue: false, displayDuringSetup: true, required: false
@@ -208,7 +218,8 @@ metadata {
 
 def parse(String description) {
   def result = null
-  logDebug("parse($description)")
+  logDebug("parse(description)")
+  logTrace "description: $description"
   if (description != "updated") {
     def cmd = zwave.parse(description, [0x20: 1, 0x26: 1, 0x70: 1])
     logTrace "cmd: $cmd"
@@ -216,7 +227,7 @@ def parse(String description) {
       result = zwaveEvent(cmd)
     }
   }
-  if (!result) {
+  if (result == null) {
     log.warn "Parse returned ${result} for command ${cmd}"
   }
   else {
@@ -285,10 +296,14 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
     updateDataValue("MSR", msr)
     cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
   }
-  if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
-    updateDataValue("manufacturer", cmd.manufacturerName)
-    cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
-  }  
+  if (!(cmd.manufacturerId.toString().equals(getDataValue("manufacturer")))) {
+    updateDataValue("manufacturer", cmd.manufacturerId.toString())
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer ID: ${cmd.manufacturerId}", isStateChange: true, displayed: false])
+  }
+  if (!(cmd.manufacturerName.equals(getDataValue("manufacturerName")))) {
+    updateDataValue("manufacturerName", cmd.manufacturerName)
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer name: ${cmd.manufacturerName}", isStateChange: true, displayed: false])
+  }
   cmds
 }
 
@@ -301,7 +316,9 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
   logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
   logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
-  def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
+  logDebug "firmware0Version:        ${cmd.firmware0Version}"
+  logDebug "firmware0SubVersion:     ${cmd.firmware0SubVersion}"
+  def ver = cmd.firmware0Version + '.' + cmd.firmware0SubVersion
   def cmds = []
   if (!(ver.equals(getDataValue("firmware")))) {
     updateDataValue("firmware", ver)
@@ -329,7 +346,7 @@ def zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelStopLev
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
   // Handles all Z-Wave commands we aren't interested in
-  logDebug "zwaveEvent(hubitat.zwave.Command cmd)"
+  log.warn "zwaveEvent(hubitat.zwave.Command cmd)"
   logTrace "cmd: $cmd"
   [: ]
 }
@@ -370,11 +387,13 @@ def setLevel(value) {
   }
   sendEvent(name: "level", value: level, unit: "%")
 
-  delayBetween([
+  def results = delayBetween([
     zwave.basicV1.basicSet(value: level).format()
     ,zwave.switchMultilevelV1.switchMultilevelGet().format()
     ,zwave.switchMultilevelV1.switchMultilevelGet().format()
   ], 5000)
+
+  return results
 }
 
 // dummy setLevel command with duration for compatibility with Home Assistant Bridge (others?)
@@ -462,16 +481,18 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
       break
 
   }
-
-  if (state.statusled1 == 0 && state.statusled2 == 0 && state.statusled3 == 0 && state.statusled4 == 0 && state.statusled5 == 0 && state.statusled6 == 0 && state.statusled7 == 0) {
-    // no LEDS are set, put back to NORMAL mode
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 13, size: 1).format()
+  
+  if (!preventSetStatusLedManageLedMode) {
+    if (state.statusled1 == 0 && state.statusled2 == 0 && state.statusled3 == 0 && state.statusled4 == 0 && state.statusled5 == 0 && state.statusled6 == 0 && state.statusled7 == 0) {
+      // no LEDS are set, put back to NORMAL mode
+      cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 13, size: 1).format()
+    }
+    else {
+      // at least one LED is set, put to status mode
+      cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 13, size: 1).format()
+    }
   }
-  else {
-    // at least one LED is set, put to status mode
-    cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 13, size: 1).format()
-  }
-
+  
   if (led == 8 | led == 0) {
     for (def ledToChange = 1; ledToChange <= 7; ledToChange++) {
       // set color for all LEDs
@@ -482,10 +503,10 @@ def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
     // set color for specified LED
     cmds << zwave.configurationV2.configurationSet(configurationValue: [color.intValue()], parameterNumber: led.intValue() + 20, size: 1).format()
   }
-
+  
   // check if LED should be blinking
   def blinkval = state.blinkval
-
+  
   if (blink) {
     switch (led) {
       case 1:
@@ -590,7 +611,6 @@ def setDefaultColor(color) {
   delayBetween(cmds, 500)
 }
 
-
 def poll() {
   logDebug "poll()"
   zwave.switchMultilevelV1.switchMultilevelGet().format()
@@ -617,9 +637,10 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           result += createEvent([name: "switch", value: "on", type: "physical"])
 
           if (singleTapToFullBright) {
-            result += setLevel(99)
-            result += response("delay 5000")
-            result += response(zwave.switchMultilevelV1.switchMultilevelGet())
+            result += delayBetween([
+              response(setLevel(99))
+              ,response(zwave.switchMultilevelV1.switchMultilevelGet().format())
+            ], 5000)
           }
           break
         case 1:
@@ -634,9 +655,10 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           // 2 Times
           result += createEvent(tapUp2Response("physical"))
           if (doubleTapToFullBright) {
-            result += setLevel(99)
-            result += response("delay 5000")
-            result += response(zwave.switchMultilevelV1.switchMultilevelGet())
+            result += delayBetween([
+              response(setLevel(99))
+              ,response(zwave.switchMultilevelV1.switchMultilevelGet().format())
+            ], 5000)
           }
           break
         case 4:
@@ -676,9 +698,10 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
           // 2 Times
           result += createEvent(tapDown2Response("physical"))
           if (doubleTapDownToDim) {
-            result += setLevel(25)
-            result += response("delay 5000")
-            result += response(zwave.switchMultilevelV1.switchMultilevelGet())
+            result += delayBetween([
+              response(setLevel(25))
+              ,response(zwave.switchMultilevelV1.switchMultilevelGet().format())
+            ], 5000)
           }
           break
         case 4:
@@ -701,6 +724,13 @@ def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cm
     default:
       // unexpected case
       log.warn("unexpected scene: $cmd.sceneNumber")
+  }
+  
+  if (traceLogEnable) {
+    logTrace "Tap action super trace:"
+    for (Object o: result) {
+      log.warn o
+    }
   }
   return result
 }
@@ -828,7 +858,7 @@ def configure() {
 def setPrefs() {
   logDebug "setPrefs()"
   def cmds = []
-
+  
   if (logEnable || traceLogEnable) {
     log.warn "Debug logging is on and will be scheduled to turn off automatically in 30 minutes."
     unschedule()
@@ -860,39 +890,39 @@ def setPrefs() {
         break
     }
   }
-
+  
   if (localcontrolramprate != null) {
     //log.debug localcontrolramprate
     def localRamprate = Math.max(Math.min(localcontrolramprate.toInteger(), 90), 0)
     cmds << zwave.configurationV2.configurationSet(configurationValue: [localRamprate.toInteger()], parameterNumber: 12, size: 1).format()
   }
-
+  
   if (remotecontrolramprate != null) {
     //log.debug remotecontrolramprate
     def remoteRamprate = Math.max(Math.min(remotecontrolramprate.toInteger(), 90), 0)
     cmds << zwave.configurationV2.configurationSet(configurationValue: [remoteRamprate.toInteger()], parameterNumber: 11, size: 1).format()
   }
-
+  
   if (reverseSwitch) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 4, size: 1).format()
   }
   else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 4, size: 1).format()
   }
-
+  
   if (bottomled) {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [0], parameterNumber: 3, size: 1).format()
   }
   else {
     cmds << zwave.configurationV2.configurationSet(configurationValue: [1], parameterNumber: 3, size: 1).format()
   }
-
+  
   //Enable the following configuration gets to verify configuration in the logs
   //cmds << zwave.configurationV1.configurationGet(parameterNumber: 7).format()
   //cmds << zwave.configurationV1.configurationGet(parameterNumber: 8).format()
   //cmds << zwave.configurationV1.configurationGet(parameterNumber: 9).format()
   //cmds << zwave.configurationV1.configurationGet(parameterNumber: 10).format()
-
+  
   logTrace "cmds: $cmds"
   return cmds
 }
