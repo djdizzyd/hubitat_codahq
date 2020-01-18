@@ -29,6 +29,7 @@
  *                       Fixed firmware reporting for new Hubitat command classes
  *                       Made manufacturer an int and added manufacturer name
  *                       Fixed fingerprint hopefully
+ *  1.0.5     2020-01-18 Added an overloaded setStatusLed that takes Strings as parameters for people coming from the OOB driver
  *
  *
  *	Previous Driver's Changelog:
@@ -428,6 +429,10 @@ def setBlinkDurationMS(newBlinkDuration) {
     log.warn "commanded blink duration ${newBlinkDuration} is outside range 0 .. 25500 ms"
   }
   return cmds
+}
+
+def setStatusLed(String led, String color, String blink) {
+  setStatusLed(led.toInteger(), color.toInteger(), blink.toInteger())
 }
 
 def setStatusLed(BigDecimal led, BigDecimal color, BigDecimal blink) {
