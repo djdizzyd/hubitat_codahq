@@ -31,6 +31,7 @@
  *                         on when load off or the setStatusLed command.  However, it lets a user hide load when no status LEDs are set
  *                       Fixed firmware reporting for new Hubitat command classes
  *                       Made manufacturer an int and added manufacturer name
+ *                       Fixed fingerprint hopefully
  *
  *
  *	Previous Driver's Changelog:
