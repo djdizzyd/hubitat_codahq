@@ -309,7 +309,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
     updateDataValue("manufacturer", cmd.manufacturerId.toString())
     cmds << createEvent([descriptionText: "$device.displayName manufacturer ID: ${cmd.manufacturerId}", isStateChange: true, displayed: false])
   }
-  if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
+  if (!(cmd.manufacturerName.equals(getDataValue("manufacturerName")))) {
     updateDataValue("manufacturerName", cmd.manufacturerName)
     cmds << createEvent([descriptionText: "$device.displayName manufacturer name: ${cmd.manufacturerName}", isStateChange: true, displayed: false])
   }
