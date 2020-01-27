@@ -23,6 +23,8 @@
  *  2020-01-26: Fixed logging for those that switch to this driver and have never set a logging level yet
  *              Change to two pushed buttons instead of one button that is pushed and held
  *              Bug fixes for some events
+ *              Handled the event sent when a user initiates a connectivity health test from the remote's button
+ *              Fixed firmware reporting for current Hubitat command classes
  *
  *
  *  Previous Author's Change Log:
@@ -229,13 +231,19 @@ def zwaveEvent(hubitat.zwave.commands.configurationv1.ConfigurationReport cmd) {
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
-  def fw = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
+  def fw = "${cmd.firmware0Version}.${cmd.firmware0SubVersion}"
   updateDataValue("fw", fw)
   if (state.MSR == "003B-6341-5044") {
-    updateDataValue("ver", "${cmd.applicationVersion >> 4}.${cmd.applicationVersion & 0xF}")
+    updateDataValue("ver", "${cmd.firmware0Version >> 4}.${cmd.firmware0SubVersion & 0xF}")
   }
   def text = "$device.displayName: firmware version: $fw, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
   createEvent(descriptionText: text, isStateChange: false)
+}
+
+def zwaveEvent(hubitat.zwave.commands.powerlevelv1.PowerlevelTestNodeReport cmd) {
+  logDebug "zwaveEvent(hubitat.zwave.commands.powerlevelv1.PowerlevelTestNodeReport cmd)"
+  logTrace "cmd: $cmd"
+  logInfo "Connectivity testing performed by user at remote..."
 }
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
@@ -244,7 +252,7 @@ def zwaveEvent(hubitat.zwave.Command cmd) {
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
   def msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
-  log.debug "msr: $msr"
+  logDebug "msr: $msr"
   updateDataValue("MSR", msr)
 }
 
