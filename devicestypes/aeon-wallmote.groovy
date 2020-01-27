@@ -20,6 +20,7 @@
  *
  *  Change Log:
  *  2020-01-23: Initial
+ *  2020-01-26: Fixed logging for those that switch to this driver and have never set a logging level yet
  *
  *
  *  Previous Author's Change Log:
@@ -241,7 +242,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
 }
 
 def installed() {
-  logDebug "installed()"
+  log.info "...Aeon WallMote Installed..."
   configure()
 }
 
@@ -448,15 +449,15 @@ private def getHeldButtons() {
 }
 
 private logInfo(msg) {
-  if (settings.loggingLevel.toInteger() >= 1) log.info msg
+  if (settings.loggingLevel?.toInteger() >= 1) log.info msg
 }
 
 def logDebug(msg) {
-  if (settings.loggingLevel.toInteger() >= 2) log.debug msg
+  if (settings.loggingLevel?.toInteger() >= 2) log.debug msg
 }
 
 def logTrace(msg) {
-  if (settings.loggingLevel.toInteger() >= 3) log.trace msg
+  if (settings.loggingLevel?.toInteger() >= 3) log.trace msg
 }
 
 /**
