@@ -21,6 +21,8 @@
  *  Change Log:
  *  2020-01-23: Initial
  *  2020-01-26: Fixed logging for those that switch to this driver and have never set a logging level yet
+ *              Change to two pushed buttons instead of one button that is pushed and held
+ *              Bug fixes for some events
  *
  *
  *  Previous Author's Change Log:
@@ -42,7 +44,6 @@ metadata {
     capability "Health Check"
 
     attribute "sequenceNumber", "number"
-    attribute "numberOfButtons", "number"
     attribute "needUpdate", "string"
 
     fingerprint mfr: "0086", prod: "0102", model: "0082", deviceJoinName: "Aeon WallMote"
@@ -91,46 +92,52 @@ def zwaveEvent(hubitat.zwave.commands.switchmultilevelv3.SwitchMultilevelStartLe
   logDebug "zwaveEvent(hubitat.zwave.commands.switchmultilevelv3.SwitchMultilevelStartLevelChange cmd)"
   logTrace "cmd: $cmd"
  
+  def result = []
+  
   //if not held buttons and button slide is enabled
   if (!getHeldButtons() && settings."3" == "1") {
     switch (cmd.upDown) {
       case false: // Up
         logTrace "Slide up"
-        buttonEvent(device.currentValue("numberOfButtons"), "pushed")
+        result << buttonEvent(device.currentValue("numberOfButtons") - 1, "pushed")
         break
       case true: // Down
         logTrace "Slide down"
-        buttonEvent(device.currentValue("numberOfButtons"), "held")
+        result << buttonEvent(device.currentValue("numberOfButtons"), "pushed")
         break
       default:
         logDebug "Unhandled SwitchMultilevelStartLevelChange: ${cmd}"
         break
     }
   }
+  result
 }
 
 def zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.centralscenev1.CentralSceneNotification cmd)"
   logTrace "cmd: $cmd"
 
+  def result = []
+  
   sendEvent(name: "sequenceNumber", value: cmd.sequenceNumber, displayed:false)
   switch (cmd.keyAttributes) {
     case 0:
-      buttonEvent(cmd.sceneNumber, "pushed")
+      result << buttonEvent(cmd.sceneNumber, "pushed")
       break
     case 1: // released
       state."${cmd.sceneNumber}" = cmd.keyAttributes
-      if (!settings.holdMode || settings.holdMode == "2") buttonEvent(cmd.sceneNumber, "held")
-      buttonEvent(cmd.sceneNumber, "released")
+      if (!settings.holdMode || settings.holdMode == "2") result << buttonEvent(cmd.sceneNumber, "held")
+      result << buttonEvent(cmd.sceneNumber, "released")
       break
     case 2: // held
       state."${cmd.sceneNumber}" = cmd.keyAttributes
-      if (settings.holdMode == "1") buttonEvent(cmd.sceneNumber, "held")
+      if (settings.holdMode == "1") result << buttonEvent(cmd.sceneNumber, "held")
       break
     default:
       logDebug "Unhandled CentralSceneNotification: ${cmd}"
       break
   }
+  result
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
@@ -254,7 +261,7 @@ def updated() {
   state.wakeCount = 1
   def cmds = update_needed_settings()
   sendEvent(name: "checkInterval", value: 2 * 60 * 12 * 60 + 5 * 60, displayed: false, data: [protocol: "zwave", hubHardwareId: device.hub.hardwareID])
-  sendEvent(name: "numberOfButtons", value: settings.buttons ? (settings."3" == "1" ? settings.buttons.toInteger() + 1 : settings.buttons) : (settings."3" ? 4 + 1 : 4), displayed: true)
+  sendEvent(name: "numberOfButtons", value: getNumButtons(), displayed: true)
   sendEvent(name:"needUpdate", value: device.currentValue("needUpdate"), displayed:false, isStateChange: true)
   if (cmds != []) response(commands(cmds))
 }
@@ -263,8 +270,12 @@ def configure() {
   logDebug "Configuring Device For Use"
   def cmds = []
   cmds = update_needed_settings()
-  sendEvent(name: "numberOfButtons", value: settings.buttons ? (settings."3" == "1" ? settings.buttons.toInteger() + 1 : settings.buttons) : (settings."3" ? 4 + 1 : 4), displayed: true)
+  sendEvent(name: "numberOfButtons", value: getNumButtons(), displayed: true)
   if (cmds != []) commands(cmds)
+}
+
+private getNumButtons() {
+  return settings.buttons ? (settings."3" == "1" ? settings.buttons.toInteger() + 2 : settings.buttons) : (settings."3" ? 4 + 2 : 4)
 }
 
 def ping() {
