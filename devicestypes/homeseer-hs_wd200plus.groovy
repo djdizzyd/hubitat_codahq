@@ -76,6 +76,7 @@ metadata {
     capability "PushableButton"
     capability "Configuration"
 
+    command "flash"
     command "tapUp2"
     command "tapDown2"
     command "tapUp3"
@@ -131,6 +132,7 @@ metadata {
     input("localcontrolramprate", "number", title: "Press Configuration button after changing preferences\n\nLocal Ramp Rate: Duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
     input("remotecontrolramprate", "number", title: "Remote Ramp Rate: duration (0-90)(1=1 sec) [default: 3]", defaultValue: 3, range: "0..90", required: false)
     input("color", "enum", title: "Default LED Color", options: ["White", "Red", "Green", "Blue", "Magenta", "Yellow", "Cyan"], description: "Select Color", required: false)
+    input name: "flashRate", type: "enum", title: "Flash rate", options: [[750: "750ms"], [1000: "1s"], [2000: "2s"], [5000: "5s"]], defaultValue: 750
     input name: "descriptionTextEnable", type: "bool", title: "Enable descriptionText logging", defaultValue: false
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
     input name: "traceLogEnable", type: "bool", title: "Enable trace logging", defaultValue: false
@@ -256,12 +258,24 @@ def zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelSet cmd
 private dimmerEvents(hubitat.zwave.Command cmd) {
   logDebug "dimmerEvents(hubitat.zwave.Command cmd)"
   logTrace "cmd: $cmd"
+  
+  def currval = device.currentValue("switch")
   def value = (cmd.value ? "on" : "off")
-  def result = [createEvent(name: "switch", value: value)]
-  logInfo "Switch for ${device.label} is ${value}"
+  def result = []
+  def type
+  
+  if (value != currval) {
+    type = "physical"
+    logInfo "Switch for ${device.label} is ${value}"
+    result << createEvent(name: "switch", value: value, type: type)
+  }
+  else {
+    type = "digital"
+  }
+  
   state.lastLevel = cmd.value
   if (cmd.value && cmd.value <= 100) {
-    result << createEvent(name: "level", value: cmd.value, unit: "%")
+    result << createEvent(name: "level", value: cmd.value, unit: "%", type: type)
     logInfo "Level for ${device.label} is ${cmd.value}"
   }
   return result
@@ -348,7 +362,7 @@ def zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelStopLev
 def zwaveEvent(hubitat.zwave.Command cmd) {
   // Handles all Z-Wave commands we aren't interested in
   log.warn "zwaveEvent(hubitat.zwave.Command cmd)"
-  logTrace "cmd: $cmd"
+  log.warn "cmd: $cmd"
   [: ]
 }
 
@@ -361,32 +375,59 @@ indicatorWhenOn()
 
 def on() {
   logDebug "on()"
+  state.flashing = false
   sendEvent(tapUp1Response("digital"))
-  delayBetween([
-    zwave.basicV1.basicSet(value: 0xFF).format(),
-    zwave.switchMultilevelV1.switchMultilevelGet().format()
-  ], 5000)
+  sendEvent(name: "switch", value: "on", isStateChange: true, descriptionText: "$device.displayName is on", type: "digital")
+  cmds = []
+  cmds << zwave.basicV1.basicSet(value: 0xFF).format()
+  cmds << zwave.switchMultilevelV1.switchMultilevelGet().format()
+  delayBetween(cmds, 5000)
 }
 
 def off() {
   logDebug "off()"
+  state.flashing = false
+  sendEvent(name: "switch", value: "off", isStateChange: true, descriptionText: "$device.displayName is off", type: "digital")
   sendEvent(tapDown1Response("digital"))
-  delayBetween([
-    zwave.basicV1.basicSet(value: 0x00).format(),
-    zwave.switchMultilevelV1.switchMultilevelGet().format()
-  ], 5000)
+  cmds = []
+  cmds << zwave.basicV1.basicSet(value: 0x00).format()
+  cmds << zwave.switchMultilevelV1.switchMultilevelGet().format()
+  delayBetween(cmds, 5000)
+}
+
+def flash() {
+  logDebug "flash()"
+  logInfo "${device.getDisplayName()} was set to flash with a rate of ${flashRate} milliseconds"
+  state.flashing = true
+  flashOn()
+}
+
+def flashOn() {
+  if (!state.flashing) return
+  runInMillis(flashRate.toInteger(), flashOff)
+  return [zwave.basicV1.basicSet(value: 0xFF).format()]
+}
+
+def flashOff() {
+  if (!state.flashing) return
+  runInMillis(flashRate.toInteger(), flashOn)
+  return [zwave.basicV1.basicSet(value: 0x00).format()]
 }
 
 def setLevel(value) {
   logDebug "setLevel($value)"
+  state.flashing = false
   def valueaux = value as Integer
   def level = Math.max(Math.min(valueaux, 99), 0)
-  if (level > 0) {
-    sendEvent(name: "switch", value: "on")
-  } else {
-    sendEvent(name: "switch", value: "off")
+  def currval = device.currentValue("switch")
+  
+  if (level > 0 && currval == "off") {
+    sendEvent(name: "switch", value: "on", descriptionText: "${device.label} is on")
   }
-  sendEvent(name: "level", value: level, unit: "%")
+  else if (level == 0 && currval == "on") {
+    sendEvent(name: "switch", value: "off", descriptionText: "${device.label} is off")
+  }
+  sendEvent(name: "level", value: level, unit: "%", descriptionText: "Level for ${device.label} is ${level}")
 
   def results = delayBetween([
     zwave.basicV1.basicSet(value: level).format()
