@@ -356,7 +356,7 @@ def zwaveEvent(hubitat.zwave.commands.switchmultilevelv1.SwitchMultilevelStopLev
 def zwaveEvent(hubitat.zwave.Command cmd) {
   // Handles all Z-Wave commands we aren't interested in
   log.warn "zwaveEvent(hubitat.zwave.Command cmd)"
-  logTrace "cmd: $cmd"
+  log.warn "cmd: $cmd"
   [: ]
 }
 
