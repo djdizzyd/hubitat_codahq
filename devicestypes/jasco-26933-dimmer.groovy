@@ -348,13 +348,13 @@ def zwaveEvent(hubitat.zwave.commands.switchmultilevelv3.SwitchMultilevelReport 
     sendEvent(name: "level", value: cmd.value, unit: "%", descriptionText: "Level for ${device.label} is ${level}")
     if (device.currentValue("switch") == "off") {
       logInfo msg
-      sendEvent(name: "switch", value: "on", descriptionText: "$msg", isStateChange: true)
+      sendEvent(name: "switch", value: "on", descriptionText: "$msg", isStateChange: true, type: "physical")
     }
   }
   else {
     if (device.currentValue("switch") == "on") {
       logInfo msg
-      sendEvent(name: "switch", value: "off", descriptionText: "$msg", isStateChange: true)
+      sendEvent(name: "switch", value: "off", descriptionText: "$msg", isStateChange: true, type: "physical")
     }
   }
 }
@@ -374,20 +374,20 @@ def on() {
   logDebug "on()"
   state.flashing = false
   def cmds = []
-  sendEvent(name: "switch", value: "on", isStateChange: true, descriptionText: "${device.label} is on")
+  sendEvent(name: "switch", value: "on", isStateChange: true, descriptionText: "${device.label} is on", type: "digital")
   cmds << zwave.basicV1.basicSet(value: 0xFF).format()
   cmds << zwave.switchMultilevelV2.switchMultilevelGet().format()
-  delayBetween(cmds, 3000)
+  delayBetween(cmds, 5000)
 }
 
 def off() {
   logDebug "off()"
   state.flashing = false
   def cmds = []
-  sendEvent(name: "switch", value: "off", isStateChange: true, descriptionText: "${device.label} is off")
+  sendEvent(name: "switch", value: "off", isStateChange: true, descriptionText: "${device.label} is off", type: "digital")
   cmds << zwave.basicV1.basicSet(value: 0x00).format()
   cmds << zwave.switchMultilevelV2.switchMultilevelGet().format()
-  delayBetween(cmds, 3000)
+  delayBetween(cmds, 5000)
 }
 
 def flash() {
