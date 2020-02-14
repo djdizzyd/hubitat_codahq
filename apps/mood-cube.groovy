@@ -226,7 +226,7 @@ private restoreStates(sceneId) {
 			light.off()
 		}
 
-		if (type != "switch") {
+		if (type != "switch" && isOn) {
 			def level = switchLevel(sceneId, light)
 
 			if (type == "level") {

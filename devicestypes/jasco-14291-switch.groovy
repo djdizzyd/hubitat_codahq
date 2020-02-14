@@ -4,7 +4,7 @@
  *
  *  Copyright 2019 Ben Rimmasch
  *
- *  Modified from the work by NuttyTree device handler for SmartThings and smr device driver for Hubitat
+ *  Derived from the work of NuttyTree's device handler for SmartThings
  *
  *
  *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -34,7 +34,7 @@
 
 metadata {
   definition(name: "Jasco Z-Wave Plus Switch", namespace: "codahq-hubitat", author: "Ben Rimmasch",
-            importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/jasco-14291-switch.groovy") {
+             importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/jasco-14291-switch.groovy") {
     capability "Actuator"
     capability "PushableButton"
     capability "DoubleTapableButton"
@@ -47,9 +47,9 @@ metadata {
 
     attribute "inverted", "enum", ["inverted", "not inverted"]
 
+    command "flash"
     command "doubleUp"
     command "doubleDown"
-    command "flash"
 
     // These include version because there are older firmwares that don't support double-tap or the extra association groups
     fingerprint mfr: "0063", prod: "4952", model: "3036", ver: "5.20", deviceJoinName: "GE Z-Wave Plus Wall Switch"
@@ -156,8 +156,10 @@ def zwaveEvent(hubitat.zwave.commands.crc16encapv1.Crc16Encap cmd) {
 
   def encapsulatedCommand = zwave.getCommand(cmd.commandClass, cmd.command, cmd.data, version)
   if (!encapsulatedCommand) {
-    logDebug "zwaveEvent(): Could not extract command from ${cmd}"
-  } else {
+    log.warn "zwaveEvent(): Could not extract command from ${cmd}"
+  }
+  else {
+    logDebug("zwaveEvent(): Extracted command ${encapsulatedCommand}")
     return zwaveEvent(encapsulatedCommand)
   }
 }
@@ -233,12 +235,16 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   def cmds = []
   if (!(msr.equals(getDataValue("MSR")))) {
     updateDataValue("MSR", msr)
+    cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
   }
-  if (!(cmd.manufacturerName.equals(getDataValue("manufacturer")))) {
-    updateDataValue("manufacturer", cmd.manufacturerName)
+  if (!(cmd.manufacturerId.toString().equals(getDataValue("manufacturer")))) {
+    updateDataValue("manufacturer", cmd.manufacturerId.toString())
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer ID: ${cmd.manufacturerId}", isStateChange: true, displayed: false])
   }
-  cmds << createEvent([descriptionText: "$device.displayName MSR: $msr", isStateChange: true, displayed: false])
-  cmds << createEvent([descriptionText: "$device.displayName manufacturer: $msr", isStateChange: true, displayed: false])
+  if (!(cmd.manufacturerName.equals(getDataValue("manufacturerName")))) {
+    updateDataValue("manufacturerName", cmd.manufacturerName)
+    cmds << createEvent([descriptionText: "$device.displayName manufacturer name: ${cmd.manufacturerName}", isStateChange: true, displayed: false])
+  }
   cmds
 }
 
@@ -251,11 +257,15 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zWaveLibraryType:        ${cmd.zWaveLibraryType}"
   logDebug "zWaveProtocolVersion:    ${cmd.zWaveProtocolVersion}"
   logDebug "zWaveProtocolSubVersion: ${cmd.zWaveProtocolSubVersion}"
-  def ver = cmd.applicationVersion + '.' + cmd.applicationSubVersion
+  logDebug "firmware0Version:        ${cmd.firmware0Version}"
+  logDebug "firmware0SubVersion:     ${cmd.firmware0SubVersion}"
+  def ver = cmd.firmware0Version + '.' + cmd.firmware0SubVersion
+  def cmds = []
   if (!(ver.equals(getDataValue("firmware")))) {
     updateDataValue("firmware", ver)
+    cmds << createEvent([descriptionText: "Firmware version " + ver, isStateChange: true, displayed: false])
   }
-  createEvent([descriptionText: "Firmware V" + ver, isStateChange: true, displayed: false])
+  cmds
 }
 
 
@@ -392,7 +402,7 @@ def off() {
 
 def flash() {
   def descriptionText = "${device.getDisplayName()} was set to flash with a rate of ${flashRate} milliseconds"
-  if (txtEnable) log.info "${descriptionText}"
+  logInfo "${descriptionText}"
   state.flashing = true
   flashOn()
 }
