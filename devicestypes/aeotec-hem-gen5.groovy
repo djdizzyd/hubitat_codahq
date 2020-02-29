@@ -21,20 +21,20 @@ import groovy.transform.Field
 
 // metadata
 metadata {
-	definition (name: "Aeon HEM Gen5", namespace: "hubitat-codahq", author: "Ben Rimmasch",
-             importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/aeotec-hem-gen5.groovy") {
-		capability "Energy Meter"
-		capability "Power Meter"
-		capability "Configuration"
-		capability "Sensor"
-		capability "Refresh"
-		
+  definition(name: "Aeon HEM Gen5", namespace: "hubitat-codahq", author: "Ben Rimmasch",
+    importUrl: "https://raw.githubusercontent.com/codahq/hubitat_codahq/master/devicestypes/aeotec-hem-gen5.groovy") {
+    capability "Energy Meter"
+    capability "Power Meter"
+    capability "Configuration"
+    capability "Sensor"
+    capability "Refresh"
+
     command "reset"
-    
-		attribute "current", "number"
-		attribute "voltage", "number"
+
+    attribute "current", "number"
+    attribute "voltage", "number"
     attribute "cost", "number"
-    
+
     //comment the ones out that you don't want to persist
     attribute "power1", "number"
     attribute "power2", "number"
@@ -44,9 +44,9 @@ metadata {
     attribute "voltage2", "number"
     attribute "cost1", "number"
     attribute "cost2", "number"
-    
-		fingerprint deviceId: "0x005F", inClusters: "0x5E,0x86,0x72,0x32,0x56,0x60,0x70,0x59,0x85,0x7A,0x73,0x98"
-	}
+
+    fingerprint deviceId: "0x005F", inClusters: "0x5E,0x86,0x72,0x32,0x56,0x60,0x70,0x59,0x85,0x7A,0x73,0x98"
+  }
 
   preferences {
     section("Aeon HEM") {
@@ -106,37 +106,37 @@ def initialize() {
 }
 
 def refresh() {
-	//Get HEM totals
+  //Get HEM totals
   def request = [
-		zwave.meterV3.meterGet(scale: 0),	//kWh
-		zwave.meterV3.meterGet(scale: 2),	//Wattage
-		zwave.meterV3.meterGet(scale: 4),	//Volts
-		zwave.meterV3.meterGet(scale: 5),	//Amps
-	]
-  
+    zwave.meterV3.meterGet(scale: 0),  //kWh
+    zwave.meterV3.meterGet(scale: 2),  //Wattage
+    zwave.meterV3.meterGet(scale: 4),  //Volts
+    zwave.meterV3.meterGet(scale: 5),  //Amps
+  ]
+
   //add parameter query
   //request += configurationGets  
-  
-	commands(request)
+
+  commands(request)
 }
 
 def reset() {
-	def stamp = new Date().format("YYYY-MM-dd", location.timeZone) + " @ " + new Date().format("h:mm a", location.timeZone)    
-	state."Last Reset Time" = stamp
-	sendEvent(name: "lastresettime", value: stamp)	
-	def request = [
-		zwave.meterV3.meterReset(),
-		zwave.meterV3.meterGet(scale: 0),	//kWh
-		zwave.meterV3.meterGet(scale: 2),	//Wattage
-		zwave.meterV3.meterGet(scale: 4),	//Volts
-		zwave.meterV3.meterGet(scale: 5),	//Amps
-	]
-	commands(request)
+  def stamp = new Date().format("YYYY-MM-dd", location.timeZone) + " @ " + new Date().format("h:mm a", location.timeZone)
+  state."Last Reset Time" = stamp
+  sendEvent(name: "lastresettime", value: stamp)
+  def request = [
+    zwave.meterV3.meterReset(),
+    zwave.meterV3.meterGet(scale: 0),  //kWh
+    zwave.meterV3.meterGet(scale: 2),  //Wattage
+    zwave.meterV3.meterGet(scale: 4),  //Volts
+    zwave.meterV3.meterGet(scale: 5),  //Amps
+  ]
+  commands(request)
 }
 
 def configure() {
   logInfo "Configuring device ${device.label}"
-  
+
   def request = [
     //Reset meter parameters to defaults
     //zwave.configurationV1.configurationSet(parameterNumber: 255, size: 1, scaledConfigurationValue: 1),
@@ -144,14 +144,14 @@ def configure() {
     //zwave.configurationV1.configurationSet(parameterNumber: 100, size: 1, scaledConfigurationValue: 1),
     //Reset parameters 111-113 to defaults
     //zwave.configurationV1.configurationSet(parameterNumber: 110, size: 1, scaledConfigurationValue: 1),
-    
+
     // Associate so that reports work
     zwave.associationV2.associationRemove(groupingIdentifier: 1, nodeId: []),
     zwave.associationV2.associationSet(groupingIdentifier: 1, nodeId: zwaveHubNodeId),
-    
+
     //Selective reports. Set to 0 to reduce network traffic. If disabled reports by from parameters 4-11 are disabled
     zwave.configurationV1.configurationSet(parameterNumber: 3, size: 1, scaledConfigurationValue: enableSelectiveReports ? 1 : 0),
-    
+
     //Trigger HEM watts with change by this value (default 10)
     zwave.configurationV1.configurationSet(parameterNumber: 4, size: 2, scaledConfigurationValue: wholeHemWattTrigger),
     //Trigger clamp 1 watts with change by this value (default 50)
@@ -166,22 +166,28 @@ def configure() {
     zwave.configurationV1.configurationSet(parameterNumber: 10, size: 1, scaledConfigurationValue: clamp2PercTrigger),
 
     // Which reports need to send in Report group 1.
-    zwave.configurationV1.configurationSet(parameterNumber: 101, size: 4, scaledConfigurationValue: group1Reports.collect{ it.toInteger() }.sum()),
+    zwave.configurationV1.configurationSet(parameterNumber: 101, size: 4, scaledConfigurationValue: group1Reports.collect {
+      it.toInteger()
+    }.sum()),
     // Which reports need to send in Report group 2.
-    zwave.configurationV1.configurationSet(parameterNumber: 102, size: 4, scaledConfigurationValue: group2Reports.collect{ it.toInteger() }.sum()),
+    zwave.configurationV1.configurationSet(parameterNumber: 102, size: 4, scaledConfigurationValue: group2Reports.collect {
+      it.toInteger()
+    }.sum()),
     // Which reports need to send in Report group 3.
-    zwave.configurationV1.configurationSet(parameterNumber: 103, size: 4, scaledConfigurationValue: group3Reports.collect{ it.toInteger() }.sum()), 
+    zwave.configurationV1.configurationSet(parameterNumber: 103, size: 4, scaledConfigurationValue: group3Reports.collect {
+      it.toInteger()
+    }.sum()),
     // Interval to send Report group 1.
     zwave.configurationV1.configurationSet(parameterNumber: 111, size: 4, scaledConfigurationValue: group1Interval.toInteger()),
     // Interval to send Report group 2.
     zwave.configurationV1.configurationSet(parameterNumber: 112, size: 4, scaledConfigurationValue: group2Interval.toInteger()),
     // Interval to send Report group 3.
     zwave.configurationV1.configurationSet(parameterNumber: 113, size: 4, scaledConfigurationValue: group3Interval.toInteger())
-    
+
   ]
-  
+
   // Report which configuration commands were sent to and received by the HEM Gen5 successfully.
-  request += configurationGets   
+  request += configurationGets
   commands(request)
 }
 
@@ -203,18 +209,18 @@ def parse(String description) {
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd)"
   logTrace "cmd: $cmd"
-	
+
   state.secure = 1
-  
+
   def encapCmd = cmd.encapsulatedCommand(commandClasses)
   logTrace "encap cmd: ${encapCmd}"
-	if (encapCmd) {
-		zwaveEvent(encapCmd)
-	}
+  if (encapCmd) {
+    zwaveEvent(encapCmd)
+  }
   else {
-		log.warn "Unable to extract security message encapsulated cmd from $cmd"
-		createEvent(descriptionText: cmd.toString())
-	}
+    log.warn "Unable to extract security message encapsulated cmd from $cmd"
+    createEvent(descriptionText: cmd.toString())
+  }
 }
 
 //def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityCommandsSupportedReport cmd) {
@@ -227,7 +233,7 @@ def zwaveEvent(hubitat.zwave.commands.configurationv2.ConfigurationReport cmd) {
   logTrace "cmd: $cmd"
   def value = cmd.scaledConfigurationValue?.toInteger()
   logTrace "value: $value"
-  
+
   switch (cmd.parameterNumber) {
     case 2:
       sendConfigEvent(cmd.parameterNumber, detectionModeDescriptions[value])
@@ -275,7 +281,7 @@ private sendConfigEvent(short param, String desc) {
 def zwaveEvent(hubitat.zwave.commands.associationv2.AssociationReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.associationv2.AssociationReport cmd)"
   logTrace "cmd: $cmd"
-  
+
   logInfo "Assocation Group ${cmd.groupingIdentifier} has nodes :: ${cmd.nodeId}"
   sendEvent([name: "Group 1 Assocations", value: cmd.nodeId])
 }
@@ -283,7 +289,7 @@ def zwaveEvent(hubitat.zwave.commands.associationv2.AssociationReport cmd) {
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd)"
   logTrace "cmd: $cmd"
-  
+
   def firmware = "${cmd.applicationVersion}.${cmd.applicationSubVersion}"
   updateDataValue("firmware", firmware)
   logDebug "${device.displayName} is running firmware version: $firmware, Z-Wave version: ${cmd.zWaveProtocolVersion}.${cmd.zWaveProtocolSubVersion}"
@@ -292,7 +298,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd)"
   logTrace "cmd: $cmd"
-  
+
   logDebug "manufacturerId:   ${cmd.manufacturerId}"
   logDebug "manufacturerName: ${cmd.manufacturerName}"
   logDebug "productId:        ${cmd.productId}"
@@ -307,7 +313,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
 def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd, int clamp = 0) {
   logDebug "zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd)"
   logTrace "cmd: $cmd"
-  
+
   def sourceName = clamp == 0 ? "HEM" : "Clamp ${clamp}"
   def source = clamp == 0 ? "" : "${clamp}"
 
@@ -326,13 +332,13 @@ def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd, int clamp = 0) {
       sendEvent(name: "cost${source}", value: cost, unit: "", descriptionText: msg)
       break
     case 2: //WATTS
-      if (cmd.scaledMeterValue > MAX_WATTS) { 
+      if (cmd.scaledMeterValue > MAX_WATTS) {
         log.warn "Watts ${cmd.scaledMeterValue} too high for ${sourceName}"
         return
-      } 
+      }
       break
     case 5: //Amps
-      if (cmd.scaledMeterValue > MAX_AMPS) { 
+      if (cmd.scaledMeterValue > MAX_AMPS) {
         log.warn "Amps ${cmd.scaledMeterValue} too high for ${sourceName}"
         return
       }
@@ -341,7 +347,7 @@ def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd, int clamp = 0) {
       log.warn "scale ${cmd.scale} not handled!"
       break
   }
-  
+
   def msg = "${sourceName} ${unitNames[cmd.scale]} is ${value} ${unitAbbrs[cmd.scale]}"
   sendEvent(name: "${unitNames[cmd.scale]}${source}", value: value as String, unit: "", descriptionText: msg)
 }
@@ -349,10 +355,10 @@ def zwaveEvent(hubitat.zwave.commands.meterv3.MeterReport cmd, int clamp = 0) {
 def zwaveEvent(hubitat.zwave.commands.multichannelv3.MultiChannelCmdEncap cmd) {
   logDebug "zwaveEvent(hubitat.zwave.commands.multichannelv3.MultiChannelCmdEncap cmd)"
   logTrace "cmd: $cmd"
-    
+
   if (cmd.commandClass == 50) {
     //extract encapsulated command
-    def encapCmd = cmd.encapsulatedCommand([0x30: 1, 0x31: 1]) 
+    def encapCmd = cmd.encapsulatedCommand([0x30: 1, 0x31: 1])
     logTrace "Command from clamp ${cmd.sourceEndPoint}: ${encapCmd}"
     if (encapCmd) {
       zwaveEvent(encapCmd, cmd.sourceEndPoint)
@@ -394,7 +400,7 @@ def getConfigurationGets() {
     zwave.configurationV1.configurationGet(parameterNumber: 254), //Device Tag
     zwave.associationV2.associationGet(groupingIdentifier: 1),
     zwave.versionV1.versionGet(),
-    zwave.manufacturerSpecificV1.manufacturerSpecificGet()  
+    zwave.manufacturerSpecificV1.manufacturerSpecificGet()
   ]
 }
 
@@ -417,10 +423,10 @@ private getCommandClasses() {
 }
 
 @Field def detectionModeDescriptions = [
- 	0: "(Default) Report wattage and the absolute KWH value",
+  0: "(Default) Report wattage and the absolute KWH value",
   1: "Report positive/negative wattage and the algebraic sum KWH value",
- 	2: "Report positive/negative wattage and the positive KWH value (consuming electricity)",
- 	3: "Report positive/negative wattage and the negative KWH value (generating electricity)"
+  2: "Report positive/negative wattage and the positive KWH value (consuming electricity)",
+  3: "Report positive/negative wattage and the negative KWH value (generating electricity)"
 ]
 
 @Field def paramDescriptions = [
@@ -445,11 +451,11 @@ private getCommandClasses() {
   252: "Configuration Locked?",
   254: "Device Tag"
 ]
-  
+
 @Field def reportDescriptions = [
-  1: "KWH HEM", 
-  2: "Watts HEM", 
-  4: "Voltage HEM", 
+  1: "KWH HEM",
+  2: "Watts HEM",
+  4: "Voltage HEM",
   8: "Current HEM",
   16: "kVarh HEM",
   32: "kVar HEM",
@@ -462,13 +468,13 @@ private getCommandClasses() {
   65536: "Voltage Clamp 1",
   131072: "Voltage Clamp 2",
   //262144: "Voltage Clamp 3",
-  524288:	"Current (Amperes) Clamp 1",
+  524288: "Current (Amperes) Clamp 1",
   1048576: "Current (Amperes) Clamp 2",
   //2097152: "Current (Amperes) Clamp 3"
 ]
 
-@Field def unitNames = ["energy", "energy", "power", "count",  "voltage", "current", "powerFactor",  "unknown"]
-@Field def unitAbbrs = ["kWh",    "kVAh",   "W",     "pulses", "V",       "A",       "Power Factor", ""]
+@Field def unitNames = ["energy", "energy", "power", "count", "voltage", "current", "powerFactor", "unknown"]
+@Field def unitAbbrs = ["kWh", "kVAh", "W", "pulses", "V", "A", "Power Factor", ""]
 @Field def MAX_AMPS = 220
 @Field def MAX_WATTS = 24000
 
@@ -486,16 +492,16 @@ private getReportsFromInt(int value) {
 }
 
 private command(hubitat.zwave.Command cmd) {
-	if (state.secure) {
-		zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
-	}
+  if (state.secure) {
+    zwave.securityV1.securityMessageEncapsulation().encapsulate(cmd).format()
+  }
   else {
-		cmd.format()
-	}
+    cmd.format()
+  }
 }
 
 private commands(commands, delay = 500) {
-	delayBetween(commands.collect{ command(it) }, delay)
+  delayBetween(commands.collect { command(it) }, delay)
 }
 
 private logInfo(msg) {
