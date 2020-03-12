@@ -99,11 +99,9 @@ metadata {
 
 def initialize() {
   logInfo "Initializing..."
+  disconnect()
   if (pollingIntervalC != pollingIntervalO) {
     connect()
-  }
-  else if (device.currentValue("connected") == "true") {
-    disconnect()
   }
 }
 
@@ -187,7 +185,7 @@ def setTargetGrillTemperature(temp) {
 
 def connect() {
   logInfo "Attempting to connect..."
-  if (device.currentValue("connected") == "false") {
+  if (state.polling == false) {
     state.polling = true
     state.retry = 0
     refresh()
@@ -286,7 +284,10 @@ def statusHandler(response) {
     return
   }
   else if (state.polling) {
-    sendEvent([name: "connected", value: true, isStateChange: true])
+    if (device.currentValue("connected") == "false") { 
+      logInfo "Connected!"
+      sendEvent([name: "connected", value: true, isStateChange: true])
+    }
     def interval = getPollingInterval()
     logTrace "interval: $interval seconds"
     unschedule(refresh)

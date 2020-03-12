@@ -76,6 +76,10 @@ def installed() {
   initialize()
 }
 
+def uninstalled() {
+  telnetClose()
+}
+
 def updated() {
   logInfo('updated()')
   updateDNI()
@@ -153,6 +157,7 @@ def sendMsg(String msg, String param = null) {
 
 def parse(String msg) {
   /*trim because sometimes there's a bunch of weird whitespace characters?*/
+  logTrace "msg: $msg"
   msg = msg.trim().replace("Optoma_PJ> ", "")
   logDebug("Parse: " + msg + " len: " + msg.length())
   switch (msg) {
@@ -203,7 +208,7 @@ def parse(String msg) {
 }
 
 def telnetStatus(String status) {
-  log.warn "telnetStatus: error: " + status
+  log.error "telnetStatus: status: " + status
   if (status != "receive error: Stream is closed") {
     log.error "Connection was dropped."
     initialize()
@@ -272,10 +277,12 @@ private getCOMMANDS() {
   return [
     "refresh": "150 1",
     "filter-hours": "321 1",
+    "filter-installed": "320",
     "on": "00 1",
     "off": "00 2",
     "set-source": "12",
     "get-source": "121 1",
+    "0": "0"
   ]
 }
 
